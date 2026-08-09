@@ -525,6 +525,62 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     throw lastError || new Error('Service call failed');
   }
 
+  _confirmedRangeForDate(iso, model = this._buildModel()) {
+    if (!model.confirmedSet.has(iso)) return [];
+    const dates = [];
+    const addDate = (dateIso) => {
+      if (model.confirmedSet.has(dateIso)) dates.push(dateIso);
+    };
+    const adjacent = (dateIso, offset) => {
+      const date = this._parseISO(dateIso);
+      if (!date) return '';
+      date.setDate(date.getDate() + offset);
+      return this._isoFromDate(date);
+    };
+
+    const before = [];
+    let cursor = adjacent(iso, -1);
+    while (model.confirmedSet.has(cursor)) {
+      before.unshift(cursor);
+      cursor = adjacent(cursor, -1);
+    }
+    before.forEach(addDate);
+    addDate(iso);
+    cursor = adjacent(iso, 1);
+    while (model.confirmedSet.has(cursor)) {
+      addDate(cursor);
+      cursor = adjacent(cursor, 1);
+    }
+    return dates;
+  }
+
+  async _deleteCalendarSelection(iso) {
+    if (this._config?.calendar_edit_enabled === false || !iso || this._toggleInFlight) return;
+    if (this._rangeStart && !this._rangeEnd) {
+      this._rangeStart = '';
+      this._rangeEnd = '';
+      this._render();
+      return;
+    }
+
+    const model = this._buildModel();
+    const range = this._confirmedRangeForDate(iso, model);
+    if (!range.length) return;
+
+    this._toggleInFlight = true;
+    try {
+      for (const dateIso of range) await this._toggleCycleStart(dateIso);
+      await this._refreshSensorEntity(model.entityId);
+      this._render();
+    } catch (err) {
+      // Keep a visible trace in browser console when backend rejects the delete.
+      // eslint-disable-next-line no-console
+      console.error('menstrual-cycle-gauge-card: failed to delete calendar range', err);
+    } finally {
+      this._toggleInFlight = false;
+    }
+  }
+
   async _setCycleRange(startIso, endIso) {
     const model = this._buildModel();
     const profile = model.stateObj?.attributes?.profile;
@@ -578,7 +634,41 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     }
 
     if (this._config?.calendar_edit_enabled !== false) {
-      this.shadowRoot.querySelector('.grid')?.addEventListener('click', async (ev) => {
+      const grid = this.shadowRoot.querySelector('.grid');
+      grid?.addEventListener('contextmenu', async (ev) => {
+        const btn = ev.target?.closest?.('.day[data-iso]');
+        if (!btn) return;
+        ev.preventDefault();
+        if (this._longPressHandledAt && Date.now() - this._longPressHandledAt < 1500) {
+          this._longPressHandledAt = 0;
+          return;
+        }
+        this._suppressCalendarClick = true;
+        await this._deleteCalendarSelection(btn.getAttribute('data-iso'));
+      });
+      grid?.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType !== 'touch' || ev.button !== 0) return;
+        const btn = ev.target?.closest?.('.day[data-iso]');
+        if (!btn) return;
+        clearTimeout(this._calendarLongPressTimer);
+        this._calendarLongPressTimer = setTimeout(async () => {
+          this._calendarLongPressTimer = null;
+          this._longPressHandledAt = Date.now();
+          this._suppressCalendarClick = true;
+          await this._deleteCalendarSelection(btn.getAttribute('data-iso'));
+        }, 550);
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+        grid?.addEventListener(eventName, () => {
+          clearTimeout(this._calendarLongPressTimer);
+          this._calendarLongPressTimer = null;
+        });
+      });
+      grid?.addEventListener('click', async (ev) => {
+        if (this._suppressCalendarClick) {
+          this._suppressCalendarClick = false;
+          return;
+        }
         const btn = ev.target?.closest?.('.day[data-iso]');
         if (!btn) return;
         const iso = btn.getAttribute('data-iso');
@@ -665,7 +755,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
-        .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; }
+        .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; }
         .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
         .day.phase-menstruation { box-shadow: inset 0 -4px 0 #fb7185; }
         .day.phase-follicular { box-shadow: inset 0 -4px 0 #f59e0b; }
@@ -710,7 +800,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               </div>
             </div>
             ${String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range'
-              ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'}</div>`
+              ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'} Right-click a saved range (or hold it on mobile) to delete it.</div>`
               : ''}
             <div class="grid">${this._calendarGrid(model, locale)}</div>
             <div class="phase-legend">
