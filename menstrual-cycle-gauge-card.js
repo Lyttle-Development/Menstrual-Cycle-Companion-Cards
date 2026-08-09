@@ -633,6 +633,13 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const countdown = Number.isFinite(daysUntil)
       ? `${daysUntil} ${this._t('days_unit')}`
       : this._t('days_unknown');
+    const samples = Array.isArray(model.stateObj?.attributes?.cycle_length_samples)
+      ? model.stateObj.attributes.cycle_length_samples.length
+      : 0;
+    const variability = Number(model.stateObj?.attributes?.cycle_length_variability_days);
+    const predictionNote = samples
+      ? `Personalized from ${samples} previous cycle${samples === 1 ? '' : 's'}${Number.isFinite(variability) && variability > 0 ? ` • typical variation ±${variability} days` : ''}`
+      : 'Using a default estimate until more cycle history is recorded';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -673,6 +680,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
+        .prediction-note { font-size: .7rem; text-align: center; color: var(--secondary-text-color); opacity: .82; }
       </style>
       <ha-card>
         <div class="wrap">
@@ -691,6 +699,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
             <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
           </div>
+          <div class="prediction-note">${predictionNote}</div>
           ${this._config.show_editor && canEdit ? `
           <div class="editor">
             <div class="toolbar">
