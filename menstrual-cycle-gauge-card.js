@@ -617,7 +617,36 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     }
   }
 
+  async _refreshCycleModel() {
+    const model = this._buildModel();
+    const profile = model.stateObj?.attributes?.profile;
+    const entityId = model.entityId || this._config?.entity || '';
+    const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
+    const payload = {
+      ...(entityId ? { entity_id: entityId } : {}),
+      ...(profile ? { profile } : {}),
+      ...(entryId ? { entry_id: entryId } : {})
+    };
+    await this._hass.callService('menstrual_cycle_companion', 'refresh_cycle_model', payload);
+    await this._refreshSensorEntity(entityId);
+    this._render();
+  }
+
   _attachHandlers() {
+    this.shadowRoot.querySelector('[data-action="refresh-model"]')?.addEventListener('click', async () => {
+      const button = this.shadowRoot.querySelector('[data-action="refresh-model"]');
+      if (button) button.disabled = true;
+      try {
+        await this._refreshCycleModel();
+      } catch (err) {
+        // Keep a visible trace in browser console when the refresh service rejects.
+        // eslint-disable-next-line no-console
+        console.error('menstrual-cycle-gauge-card: failed to refresh cycle model', err);
+      } finally {
+        const refreshedButton = this.shadowRoot.querySelector('[data-action="refresh-model"]');
+        if (refreshedButton) refreshedButton.disabled = false;
+      }
+    });
     this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
       this._render();
@@ -760,6 +789,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .title { font-weight: 700; }
         .nav { display: inline-flex; gap: 6px; }
         .btn { border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; }
+        .refresh-row { display: flex; justify-content: center; }
+        .refresh-btn { font-size: .82rem; }
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
@@ -798,6 +829,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
           </div>
           <div class="prediction-note">${predictionNote}</div>
+          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh</button></div>
           ${this._config.show_editor && canEdit ? `
           <div class="editor">
             <div class="toolbar">
