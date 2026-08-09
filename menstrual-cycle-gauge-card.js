@@ -147,6 +147,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const predicted = this._normalizeISO(attrs.next_predicted_start);
     const fertileStart = this._normalizeISO(attrs.fertile_window_start);
     const fertileEnd = this._normalizeISO(attrs.fertile_window_end);
+    const phases = {
+      menstruation: { start: this._normalizeISO(attrs.menstruation_start), end: this._normalizeISO(attrs.menstruation_end) },
+      follicular: { start: this._normalizeISO(attrs.follicular_phase_start), end: this._normalizeISO(attrs.follicular_phase_end) },
+      ovulation: { start: this._normalizeISO(attrs.ovulation_date), end: this._normalizeISO(attrs.ovulation_date) },
+      luteal: { start: this._normalizeISO(attrs.luteal_phase_start), end: this._normalizeISO(attrs.luteal_phase_end) }
+    };
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -158,7 +164,9 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         day,
         iso,
         confirmed: confirmedSet.has(iso),
-        fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false
+        fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false,
+        phase: Object.keys(phases).find((key) => phases[key].start && phases[key].end
+          && this._dayDiff(iso, phases[key].start) >= 0 && this._dayDiff(phases[key].end, iso) >= 0) || ''
       });
     }
 
@@ -172,6 +180,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       periodDuration,
       fertileStart,
       fertileEnd,
+      phases,
       daysInMonth,
       series,
       todayIso: this._isoFromDate(new Date())
@@ -366,6 +375,28 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       return `<path d="${dPath}" fill="none" stroke="${palette.fertile}" stroke-width="6" stroke-linecap="round" stroke-opacity=".62"></path>`;
     }).join('');
 
+    const phaseColors = {
+      menstruation: palette.confirmed,
+      follicular: '#f59e0b',
+      ovulation: '#60a5fa',
+      luteal: '#1e3a8a'
+    };
+    const phaseBars = Object.entries(model.phases || {}).map(([name, phase]) => {
+      if (!phase.start || !phase.end) return '';
+      const startDt = this._parseISO(phase.start);
+      const endDt = this._parseISO(phase.end);
+      if (!startDt || !endDt) return '';
+      const visibleStart = new Date(Math.max(startDt.getTime(), new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), 1, 12).getTime()));
+      const visibleEnd = new Date(Math.min(endDt.getTime(), new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), total, 12).getTime()));
+      if (visibleStart > visibleEnd) return '';
+      const startDay = visibleStart.getDate();
+      const endDay = visibleEnd.getDate();
+      const startAngle = -90 + ((((startDay - 1) + 0.06) / total) * 360);
+      const endAngle = -90 + ((((endDay) - 0.06) / total) * 360);
+      const dPath = this._arcPath(cx, cy, rInner + extraBar + 13, startAngle, endAngle);
+      return `<path d="${dPath}" fill="none" stroke="${phaseColors[name]}" stroke-width="7" stroke-linecap="butt" stroke-opacity=".82"></path>`;
+    }).join('');
+
     let predictedMarker = '';
     let predictedBars = '';
     const predictedDt = this._parseISO(model.predicted);
@@ -407,6 +438,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         ${dayLabels}
         ${baseTicks}
         ${fertileBars}
+        ${phaseBars}
         ${currentMonthPeriodWindowBars}
         ${confirmedBars}
         ${predictedBars}
@@ -447,9 +479,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       const pendingMax = [pendingStart, pendingEnd].sort()[1];
       const inPendingRange = pendingStart && pendingEnd
         && iso >= pendingMin && iso <= pendingMax;
+      const phase = model.series.find((step) => step.iso === iso)?.phase || '';
       const rangeStart = active && !model.confirmedSet.has(previousIso);
       const rangeEnd = active && !model.confirmedSet.has(nextIso);
-      items.push(`<button class="day ${active ? 'active' : ''} ${rangeStart ? 'range-start' : ''} ${rangeEnd ? 'range-end' : ''} ${inPendingRange ? 'pending-range' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
+      items.push(`<button class="day ${active ? 'active' : ''} ${phase ? `phase-${phase}` : ''} ${rangeStart ? 'range-start' : ''} ${rangeEnd ? 'range-end' : ''} ${inPendingRange ? 'pending-range' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
     }
     return items.join('');
   }
@@ -627,12 +660,19 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .dow { text-align: center; font-size: 12px; opacity: .75; }
         .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; }
         .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+        .day.phase-menstruation { box-shadow: inset 0 -4px 0 #fb7185; }
+        .day.phase-follicular { box-shadow: inset 0 -4px 0 #f59e0b; }
+        .day.phase-ovulation { box-shadow: inset 0 -4px 0 #60a5fa; }
+        .day.phase-luteal { box-shadow: inset 0 -4px 0 #1e3a8a; }
         .day.range-start { border-radius: 12px 4px 4px 12px; }
         .day.range-end { border-radius: 4px 12px 12px 4px; }
         .day.pending-range { background: color-mix(in srgb, var(--primary-color) 24%, var(--card-background-color)); border-color: var(--primary-color); box-shadow: inset 0 -3px 0 var(--primary-color); }
         .day.today { outline: 2px solid var(--primary-color); }
         .day.other { opacity: .3; }
         .range-help { font-size: .78rem; color: var(--secondary-text-color); padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
+        .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
+        .phase-key { display: inline-flex; align-items: center; gap: 4px; }
+        .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
       </style>
       <ha-card>
         <div class="wrap">
@@ -644,6 +684,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           <div class="gauge-wrap">
             ${this._renderGauge(model, palette)}
             <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
+          </div>
+          <div class="phase-legend">
+            <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>Menstruation</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>Follicular</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
           </div>
           ${this._config.show_editor && canEdit ? `
           <div class="editor">
@@ -658,6 +704,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'}</div>`
               : ''}
             <div class="grid">${this._calendarGrid(model, locale)}</div>
+            <div class="phase-legend">
+              <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>Menstruation</span>
+              <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>Follicular</span>
+              <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
+              <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
+            </div>
           </div>` : ''}
         </div>
       </ha-card>

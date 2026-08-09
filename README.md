@@ -8,10 +8,14 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 
 ## Included cards
 
-- `custom:menstrual-cycle-gauge-card` — monthly circular view with optional calendar editing.
+- `custom:menstrual-cycle-gauge-card` — monthly circular phase view with optional calendar editing.
 - `custom:menstrual-cycle-heatmap-card` — historical cycle comparison with period and fertile-window markers.
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
+
+The gauge's colored outer ring shows the proposed menstruation, follicular,
+ovulation, and luteal phases. The calendar editor uses matching colored
+underlines for each proposed phase, while confirmed bleeding days remain filled.
 
 ## Install with HACS
 
