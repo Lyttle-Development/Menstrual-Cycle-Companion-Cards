@@ -85,6 +85,12 @@ The referenced sensor should expose a `dates`, `date_list`, or `history` attribu
 
 Copy both JavaScript files into `/config/www/`, add them as JavaScript-module resources, and clear the browser cache. The integration must still be installed separately.
 
+## Publishing
+
+To publish a HACS-detectable release, update `version.json` (`major`, `minor`, or
+`patch`) and push the change to `main`. The publishing workflow creates a matching
+`v<major>.<minor>.<patch>` GitHub release.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
