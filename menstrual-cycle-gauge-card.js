@@ -1,3 +1,5 @@
+import './menstrual-cycle-heatmap-card.js';
+
 class MenstrualCycleGaugeCard extends HTMLElement {
   static getStubConfig() {
     return {

@@ -581,7 +581,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
   }
 }
 
-customElements.define('menstrual-cycle-heatmap-card', MenstrualCycleHeatmapCard);
+if (!customElements.get('menstrual-cycle-heatmap-card')) {
+  customElements.define('menstrual-cycle-heatmap-card', MenstrualCycleHeatmapCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({

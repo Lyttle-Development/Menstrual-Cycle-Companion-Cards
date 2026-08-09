@@ -12,6 +12,8 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 - `custom:menstrual-cycle-heatmap-card` — historical cycle comparison with period and fertile-window markers.
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
+The HACS gauge resource also loads and registers the heatmap card, so both card
+types are available even when HACS exposes only the primary gauge resource.
 
 The gauge's colored outer ring shows the proposed menstruation, follicular,
 ovulation, and luteal phases. The calendar editor uses matching colored
