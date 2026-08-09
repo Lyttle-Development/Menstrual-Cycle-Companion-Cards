@@ -550,35 +550,30 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          border-radius: 16px;
-          border: 1px solid ${palette.border};
-          background: ${palette.cardBg};
-          color: ${palette.cardColor};
-          box-shadow: ${palette.shadow};
-          padding: 10px;
+          padding: 16px;
           overflow: hidden;
         }
         .wrap { display: grid; gap: 10px; }
         .head { display: grid; gap: 2px; }
-        .friendly { font-size: .78rem; font-weight: 600; color: ${palette.monthText}; text-align: left; }
-        .title-label { font-size: .95rem; font-weight: 700; color: ${palette.cardColor}; text-align: left; }
+        .friendly { font-size: .78rem; font-weight: 600; color: var(--secondary-text-color); text-align: left; }
+        .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
         .gauge { width: 100%; height: 100%; display: block; }
         .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
         .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-        .countdown { pointer-events: auto; border-radius: 999px; border: 1px solid ${palette.buttonBorder}; padding: 4px 10px; background: ${palette.countdownBg}; cursor: pointer; font-size: 1.05rem; font-weight: 700; color: ${palette.countdownColor}; }
+        .countdown { pointer-events: auto; border: 1px solid var(--divider-color); border-radius: 4px; padding: 8px 12px; background: var(--primary-color); cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); }
         .countdown.overdue-soon { border-style: dashed; border-width: 2px; }
         .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .title { font-weight: 700; }
         .nav { display: inline-flex; gap: 6px; }
-        .btn { border: 1px solid ${palette.buttonBorder}; border-radius: 8px; background: ${palette.buttonBg}; color: ${palette.buttonColor}; padding: 4px 8px; cursor: pointer; }
+        .btn { border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; }
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
-        .day { min-height: 32px; border: 1px solid ${palette.dayBorder}; border-radius: 8px; background: ${palette.dayBg}; color: ${palette.dayColor}; cursor: pointer; }
-        .day.active { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
-        .day.today { outline: 2px solid ${palette.dayToday}; }
+        .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; }
+        .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+        .day.today { outline: 2px solid var(--primary-color); }
         .day.other { opacity: .3; }
       </style>
       <ha-card>
@@ -706,21 +701,31 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        .wrap { display: grid; gap: 10px; padding: 2px 0; }
+        .wrap { display: grid; gap: 12px; padding: 8px 0; }
         .row { display: grid; gap: 4px; }
         .inline { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
         .entity { display: grid; gap: 6px; }
         .entity-fallback { display: grid; gap: 6px; }
-        label { font-size: 12px; font-weight: 600; color: var(--secondary-text-color); }
+        label { font-size: 12px; font-weight: 500; color: var(--secondary-text-color); }
         input, select, button, ha-entity-picker, ha-selector { width: 100%; box-sizing: border-box; }
-        input, select, button {
-          padding: 8px 10px;
-          border-radius: 8px;
+        input, select {
+          font: inherit;
+          padding: 8px;
           border: 1px solid var(--divider-color);
+          border-radius: 4px;
           background: var(--card-background-color);
           color: var(--primary-text-color);
         }
-        button { width: auto; cursor: pointer; }
+        button {
+          width: auto;
+          padding: 8px 12px;
+          border: 1px solid var(--divider-color);
+          border-radius: 4px;
+          background: transparent;
+          color: var(--primary-text-color);
+          font: inherit;
+          cursor: pointer;
+        }
         .check { display: flex; gap: 8px; align-items: center; justify-content: flex-start; text-align: left; }
         .check input[type="checkbox"] { width: auto; min-width: 0; margin: 0; }
         .fallback-note { font-size: 11px; color: var(--secondary-text-color); opacity: .85; }

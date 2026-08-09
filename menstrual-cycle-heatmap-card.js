@@ -385,11 +385,11 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         ha-card {
           --cell-size: 11px;
           --cell-gap: 2px;
-          padding: 12px;
+          padding: 16px;
         }
         .title {
           font-weight: 600;
-          margin: 2px 0 10px;
+          margin: 0 0 12px;
           color: var(--primary-text-color);
         }
         .wrap {
