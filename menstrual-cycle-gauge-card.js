@@ -30,12 +30,37 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     };
     this._viewDate = new Date();
     this._editorOpen = false;
+    this._lastRenderedStateObj = null;
+    this._lastRenderedEntityId = null;
+    this._lastRenderedTheme = null;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    this._scheduleRender();
+  }
+
+  _scheduleRender() {
+    if (this._renderFrame) return;
+    const render = () => {
+      this._renderFrame = null;
+      const entityId = this._resolveEntityId();
+      const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+      const theme = this._resolveThemeMode();
+      if (entityId === this._lastRenderedEntityId
+        && stateObj === this._lastRenderedStateObj
+        && theme === this._lastRenderedTheme) return;
+      this._render();
+      this._lastRenderedEntityId = entityId;
+      this._lastRenderedStateObj = stateObj;
+      this._lastRenderedTheme = theme;
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      this._renderFrame = requestAnimationFrame(render);
+    } else {
+      this._renderFrame = setTimeout(render, 0);
+    }
   }
 
   getCardSize() {
@@ -583,6 +608,9 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     `;
 
     this._attachHandlers();
+    this._lastRenderedEntityId = model.entityId;
+    this._lastRenderedStateObj = model.stateObj;
+    this._lastRenderedTheme = this._resolveThemeMode();
   }
 }
 

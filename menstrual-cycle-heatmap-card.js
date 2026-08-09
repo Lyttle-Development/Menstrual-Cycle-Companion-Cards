@@ -27,12 +27,47 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       ...config,
     };
     this._ensureRoot();
+    this._lastRenderedStateObj = null;
+    this._lastRenderedEntityId = null;
+    this._lastRenderedSymptomStates = null;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    this._scheduleRender();
+  }
+
+  _configuredSymptomStateObjects() {
+    const states = this._hass?.states || {};
+    const rawConfig = Array.isArray(this._config?.symptom_entities) ? this._config.symptom_entities : [];
+    return rawConfig.map((rawItem) => {
+      const item = typeof rawItem === 'string' ? { entity: rawItem } : (rawItem || {});
+      const entityId = String(item.entity || item.entity_id || '').trim();
+      return entityId ? states[entityId] : undefined;
+    });
+  }
+
+  _scheduleRender() {
+    if (this._renderFrame) return;
+    const render = () => {
+      this._renderFrame = null;
+      const entityId = this._resolveEntityId();
+      const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+      const symptomStates = this._configuredSymptomStateObjects();
+      const symptomsUnchanged = Array.isArray(this._lastRenderedSymptomStates)
+        && symptomStates.length === this._lastRenderedSymptomStates.length
+        && symptomStates.every((state, index) => state === this._lastRenderedSymptomStates[index]);
+      if (entityId === this._lastRenderedEntityId
+        && stateObj === this._lastRenderedStateObj
+        && symptomsUnchanged) return;
+      this._render();
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      this._renderFrame = requestAnimationFrame(render);
+    } else {
+      this._renderFrame = setTimeout(render, 0);
+    }
   }
 
   getCardSize() {
@@ -201,9 +236,6 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     }).filter(Boolean);
   }
 
-  _symptomsForDate(symptomSources, dateIso) {
-    return (symptomSources || []).filter((source) => source.dates.has(dateIso));
-  }
 
   _phaseClass(day, cycleLength, showFertile) {
     if (!showFertile) return '';
@@ -258,6 +290,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           <div class="pad">${this._t('entity_not_found')}: ${this._config.entity || this._config.entry_id || this._t('unknown')}</div>
         </ha-card>
       `;
+      this._lastRenderedEntityId = entityId;
+      this._lastRenderedStateObj = stateObj;
+      this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
       return;
     }
 
@@ -276,6 +311,12 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     const periodDays = Math.max(1, Math.min(14, Number(this._config.period_duration_days || sensorPeriodDays || 5)));
     const showFertile = this._config.show_fertile_period !== false;
     const symptomSources = this._resolveSymptomSources();
+    const symptomsByDate = new Map();
+    symptomSources.forEach((source) => source.dates.forEach((dateIso) => {
+      const symptoms = symptomsByDate.get(dateIso) || [];
+      symptoms.push(source);
+      symptomsByDate.set(dateIso, symptoms);
+    }));
     const todayIso = this._normalizeISO(new Date().toISOString().slice(0, 10));
     const alignMode = String(this._config.cycle_alignment || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
 
@@ -288,6 +329,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           <div class="pad">${this._t('too_little_history')} <code>grouped_starts/history</code>.</div>
         </ha-card>
       `;
+      this._lastRenderedEntityId = entityId;
+      this._lastRenderedStateObj = stateObj;
+      this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
       return;
     }
 
@@ -316,7 +360,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         const dayIso = this._addDaysISO(cycle.start, cycleDay - 1);
         if (dayIso && todayIso && dayIso > todayIso) classes.push('is-future');
         if (dayIso && todayIso && dayIso === todayIso) classes.push('is-today');
-        const symptoms = this._symptomsForDate(symptomSources, dayIso);
+        const symptoms = symptomsByDate.get(dayIso) || [];
         if (symptoms.length) classes.push('has-symptom');
         const symptomInfo = symptoms.length ? ` | ${this._t('symptoms')}: ${symptoms.map((item) => item.name).join(', ')}` : '';
         const daysBeforeEnd = cycle.length - cycleDay;
@@ -525,6 +569,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       </ha-card>
     `;
     this._bindHeatmapScrollCues();
+    this._lastRenderedEntityId = entityId;
+    this._lastRenderedStateObj = stateObj;
+    this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
   }
 }
 
