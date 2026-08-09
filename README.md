@@ -56,13 +56,15 @@ use the original single-day add/remove behavior.
 type: custom:menstrual-cycle-heatmap-card
 entity: sensor.anna
 title: Cycle history
-max_cycles: 18
+max_cycles: 30
 period_duration_days: 5
 show_fertile_period: true
 cycle_alignment: bottom
 ```
 
 `cycle_alignment` can be `top` (align from cycle start) or `bottom` (align from cycle end).
+The heatmap includes the integration's 12 predicted future cycles by default;
+set `max_cycles` to control how many historical and predicted columns are visible.
 
 ## Symptom overlays
 

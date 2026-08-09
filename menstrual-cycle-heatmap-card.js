@@ -5,7 +5,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       entity: 'sensor.menstruation',
       entry_id: '',
       title: 'Cycle Heatmap',
-      max_cycles: 18,
+      max_cycles: 30,
       period_duration_days: 5,
       show_fertile_period: true,
       symptom_entities: [],
@@ -18,7 +18,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       throw new Error('entity or entry_id is required');
     }
     this._config = {
-      max_cycles: 18,
+      max_cycles: 30,
       period_duration_days: 5,
       title: 'Cycle Heatmap',
       show_fertile_period: true,
@@ -163,7 +163,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     return starts;
   }
 
-  _buildCycles(groupedStarts, predictedNextStart) {
+  _buildCycles(groupedStarts, predictedNextStarts) {
     const starts = Array.from(new Set((groupedStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean))).sort();
     if (starts.length < 2) return [];
 
@@ -175,14 +175,18 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       if (length > 0 && length <= 80) cycles.push({ start, end, length, predicted: false });
     }
 
-    const normalizedPredicted = this._normalizeISO(predictedNextStart);
     const lastStart = starts[starts.length - 1];
-    if (normalizedPredicted && lastStart) {
-      const predictedLength = this._dayDiff(normalizedPredicted, lastStart);
+    const predictions = Array.isArray(predictedNextStarts) ? predictedNextStarts : [predictedNextStarts];
+    let previousStart = lastStart;
+    predictions.forEach((rawPrediction) => {
+      const normalizedPrediction = this._normalizeISO(rawPrediction);
+      if (!normalizedPrediction || !previousStart) return;
+      const predictedLength = this._dayDiff(normalizedPrediction, previousStart);
       if (predictedLength > 0 && predictedLength <= 80) {
-        cycles.push({ start: lastStart, end: normalizedPredicted, length: predictedLength, predicted: true });
+        cycles.push({ start: previousStart, end: normalizedPrediction, length: predictedLength, predicted: true });
+        previousStart = normalizedPrediction;
       }
-    }
+    });
 
     return cycles;
   }
@@ -300,8 +304,10 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     const history = Array.isArray(attrs.history) ? attrs.history : [];
     const groupedStartsAttr = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
     const groupedStarts = groupedStartsAttr.length ? groupedStartsAttr : this._startsFromHistory(history);
-    const predictedNextStart = attrs.next_predicted_start || null;
-    const cycles = this._buildCycles(groupedStarts, predictedNextStart);
+    const predictedCycleStarts = Array.isArray(attrs.predicted_cycle_starts)
+      ? attrs.predicted_cycle_starts
+      : [attrs.next_predicted_start || null];
+    const cycles = this._buildCycles(groupedStarts, predictedCycleStarts);
 
     const maxCycles = Math.max(1, Number(this._config.max_cycles || 18));
     const visibleCycles = cycles.slice(-maxCycles);
