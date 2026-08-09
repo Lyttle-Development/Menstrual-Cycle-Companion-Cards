@@ -9,6 +9,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       title: 'Cycle Gauge',
       show_fertile_period: true,
       calendar_edit_enabled: true,
+      calendar_selection_mode: 'range',
       period_duration_days: 5
     };
   }
@@ -25,6 +26,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       show_editor: true,
       show_fertile_period: true,
       calendar_edit_enabled: true,
+      calendar_selection_mode: 'range',
       period_duration_days: 5,
       ...config
     };
@@ -437,7 +439,17 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       const iso = this._isoFromDate(new Date(y, m, day, 12, 0, 0, 0));
       const active = model.confirmedSet.has(iso);
       const today = iso === model.todayIso;
-      items.push(`<button class="day ${active ? 'active' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
+      const previousIso = this._isoFromDate(new Date(y, m, day - 1, 12, 0, 0, 0));
+      const nextIso = this._isoFromDate(new Date(y, m, day + 1, 12, 0, 0, 0));
+      const pendingStart = this._rangeStart || '';
+      const pendingEnd = this._rangeEnd || pendingStart;
+      const pendingMin = [pendingStart, pendingEnd].sort()[0];
+      const pendingMax = [pendingStart, pendingEnd].sort()[1];
+      const inPendingRange = pendingStart && pendingEnd
+        && iso >= pendingMin && iso <= pendingMax;
+      const rangeStart = active && !model.confirmedSet.has(previousIso);
+      const rangeEnd = active && !model.confirmedSet.has(nextIso);
+      items.push(`<button class="day ${active ? 'active' : ''} ${rangeStart ? 'range-start' : ''} ${rangeEnd ? 'range-end' : ''} ${inPendingRange ? 'pending-range' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
     }
     return items.join('');
   }
@@ -480,6 +492,32 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     throw lastError || new Error('Service call failed');
   }
 
+  async _setCycleRange(startIso, endIso) {
+    const model = this._buildModel();
+    const profile = model.stateObj?.attributes?.profile;
+    const entityId = model.entityId || this._config?.entity || '';
+    const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
+    const base = {
+      start_date: startIso,
+      end_date: endIso,
+      ...(entityId ? { entity_id: entityId } : {}),
+      ...(profile ? { profile } : {}),
+      ...(entryId ? { entry_id: entryId } : {})
+    };
+    const attempts = [base, { ...base, entry_id: undefined }, { start_date: startIso, end_date: endIso, ...(profile ? { profile } : {}) }, { start_date: startIso, end_date: endIso }];
+    let lastError = null;
+    for (const payload of attempts) {
+      Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
+      try {
+        await this._hass.callService('menstrual_cycle_companion', 'set_cycle_range', payload);
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('Range service call failed');
+  }
+
   async _refreshSensorEntity(entityId) {
     const eid = String(entityId || '').trim();
     if (!eid) return;
@@ -514,7 +552,23 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         if (!iso || this._toggleInFlight) return;
         this._toggleInFlight = true;
         try {
-          await this._toggleCycleStart(iso);
+          const rangeMode = String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range';
+          if (rangeMode) {
+            if (!this._rangeStart || this._rangeEnd) {
+              this._rangeStart = iso;
+              this._rangeEnd = '';
+              this._render();
+              return;
+            }
+            this._rangeEnd = iso;
+            const start = [this._rangeStart, this._rangeEnd].sort()[0];
+            const end = [this._rangeStart, this._rangeEnd].sort()[1];
+            await this._setCycleRange(start, end);
+            this._rangeStart = '';
+            this._rangeEnd = '';
+          } else {
+            await this._toggleCycleStart(iso);
+          }
           await this._refreshSensorEntity(this._buildModel().entityId);
           this._render();
         } catch (err) {
@@ -573,8 +627,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .dow { text-align: center; font-size: 12px; opacity: .75; }
         .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; }
         .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+        .day.range-start { border-radius: 12px 4px 4px 12px; }
+        .day.range-end { border-radius: 4px 12px 12px 4px; }
+        .day.pending-range { background: color-mix(in srgb, var(--primary-color) 24%, var(--card-background-color)); border-color: var(--primary-color); box-shadow: inset 0 -3px 0 var(--primary-color); }
         .day.today { outline: 2px solid var(--primary-color); }
         .day.other { opacity: .3; }
+        .range-help { font-size: .78rem; color: var(--secondary-text-color); padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
       </style>
       <ha-card>
         <div class="wrap">
@@ -596,6 +654,9 @@ class MenstrualCycleGaugeCard extends HTMLElement {
                 <button type="button" class="btn" data-nav="next">▶</button>
               </div>
             </div>
+            ${String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range'
+              ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'}</div>`
+              : ''}
             <div class="grid">${this._calendarGrid(model, locale)}</div>
           </div>` : ''}
         </div>
@@ -615,6 +676,7 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
       theme_mode: 'auto',
       show_fertile_period: true,
       calendar_edit_enabled: true,
+      calendar_selection_mode: 'range',
       period_duration_days: 5,
       ...config
     };
@@ -648,6 +710,9 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
         theme_dark: 'dark',
         show_fertile: 'Show fertile period',
         calendar_edit: 'Allow new entries through calendar',
+        calendar_selection: 'Calendar date selection',
+        selection_range: 'Start and end date (range)',
+        selection_toggle: 'Single-day add/remove',
     };
     return i18n[key] || key;
   }
@@ -766,6 +831,13 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
         </div>
         <label class="check"><input type="checkbox" id="show_fertile_period" ${this._config.show_fertile_period !== false ? 'checked' : ''}> ${this._t('show_fertile')}</label>
         <label class="check"><input type="checkbox" id="calendar_edit_enabled" ${this._config.calendar_edit_enabled !== false ? 'checked' : ''}> ${this._t('calendar_edit')}</label>
+        <div class="row">
+          <label>${this._t('calendar_selection')}</label>
+          <select id="calendar_selection_mode">
+            <option value="range" ${String(this._config.calendar_selection_mode || 'range') === 'range' ? 'selected' : ''}>${this._t('selection_range')}</option>
+            <option value="toggle" ${String(this._config.calendar_selection_mode || 'range') === 'toggle' ? 'selected' : ''}>${this._t('selection_toggle')}</option>
+          </select>
+        </div>
       </div>
     `;
 
@@ -846,6 +918,7 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('theme_mode')?.addEventListener('change', (ev) => this._handleInput('theme_mode', ev.target.value));
     this.shadowRoot.getElementById('show_fertile_period')?.addEventListener('change', (ev) => this._handleInput('show_fertile_period', !!ev.target.checked));
     this.shadowRoot.getElementById('calendar_edit_enabled')?.addEventListener('change', (ev) => this._handleInput('calendar_edit_enabled', !!ev.target.checked));
+    this.shadowRoot.getElementById('calendar_selection_mode')?.addEventListener('change', (ev) => this._handleInput('calendar_selection_mode', ev.target.value === 'toggle' ? 'toggle' : 'range'));
   }
 }
 

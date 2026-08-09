@@ -36,10 +36,15 @@ title: Cycle gauge
 period_duration_days: learnt
 show_fertile_period: true
 calendar_edit_enabled: true
+calendar_selection_mode: range
 theme_mode: auto
 ```
 
-Click **Show editor** or the countdown area to open the month calendar. Clicking a day calls the integration's add/remove service.
+Click **Show editor** or the countdown area to open the month calendar. In the
+default `range` mode, click the first day and then the last day of the cycle.
+The interval is highlighted while it is being selected and the completed range
+is shown with rounded start/end caps. Set `calendar_selection_mode: toggle` to
+use the original single-day add/remove behavior.
 
 ## Heatmap example
 
