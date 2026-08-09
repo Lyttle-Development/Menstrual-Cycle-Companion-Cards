@@ -1,9 +1,6 @@
 {
   "name": "Menstrual Cycle Companion Cards",
-  "filename": [
-    "menstrual-cycle-gauge-card.js",
-    "menstrual-cycle-heatmap-card.js"
-  ],
+  "filename": "menstrual-cycle-gauge-card.js",
   "homeassistant": "2024.6.0",
   "render_readme": true
 }
