@@ -644,6 +644,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           return;
         }
         this._suppressCalendarClick = true;
+        clearTimeout(this._calendarClickSuppressionTimer);
+        this._calendarClickSuppressionTimer = setTimeout(() => {
+          this._suppressCalendarClick = false;
+        }, 1000);
         await this._deleteCalendarSelection(btn.getAttribute('data-iso'));
       });
       grid?.addEventListener('pointerdown', (ev) => {
@@ -655,6 +659,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           this._calendarLongPressTimer = null;
           this._longPressHandledAt = Date.now();
           this._suppressCalendarClick = true;
+          clearTimeout(this._calendarClickSuppressionTimer);
+          this._calendarClickSuppressionTimer = setTimeout(() => {
+            this._suppressCalendarClick = false;
+          }, 1000);
           await this._deleteCalendarSelection(btn.getAttribute('data-iso'));
         }, 550);
       });
