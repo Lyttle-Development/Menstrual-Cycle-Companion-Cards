@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Menstrual Cycle Gauge Card preview</title>
+  <desc id="desc">A circular menstrual cycle gauge with period and fertile-window markers.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff1f6"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="420" rx="24" fill="url(#bg)"/>
+  <text x="360" y="42" fill="#831843" font-family="system-ui,sans-serif" font-size="22" font-weight="700" text-anchor="middle">Menstrual Cycle Gauge</text>
+  <g transform="translate(230 230)">
+    <circle r="142" fill="none" stroke="#fbcfe8" stroke-width="20"/>
+    <circle r="142" fill="none" stroke="#be123c" stroke-width="20" stroke-linecap="round" stroke-dasharray="108 784" transform="rotate(-90)"/>
+    <circle r="142" fill="none" stroke="#facc15" stroke-width="12" stroke-linecap="round" stroke-dasharray="205 687" transform="rotate(35)"/>
+    <circle r="108" fill="none" stroke="#f9a8d4" stroke-width="2"/>
+    <line y1="-100" y2="-153" stroke="#be123c" stroke-width="3" stroke-linecap="round" transform="rotate(42)"/>
+    <text y="-8" fill="#831843" font-family="system-ui,sans-serif" font-size="24" font-weight="700" text-anchor="middle">12 days</text>
+    <text y="20" fill="#9d174d" font-family="system-ui,sans-serif" font-size="14" text-anchor="middle">until next start</text>
+  </g>
+  <g transform="translate(440 150)" fill="#831843" font-family="system-ui,sans-serif">
+    <text font-size="18" font-weight="700">Monthly cycle at a glance</text>
+    <text y="34" font-size="14">• Confirmed period starts</text>
+    <text y="62" font-size="14">• Fertile-window markers</text>
+    <text y="90" font-size="14">• Optional calendar editing</text>
+  </g>
+</svg>
+

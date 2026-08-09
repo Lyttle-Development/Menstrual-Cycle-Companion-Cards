@@ -2,6 +2,10 @@
 
 Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/Lyttle-Development/menstrual-cycle-companion) Home Assistant integration.
 
+![Menstrual Cycle Gauge Card preview](images/gauge-card.svg)
+
+![Menstrual Cycle Heatmap Card preview](images/heatmap-card.svg)
+
 ## Included cards
 
 - `custom:menstrual-cycle-gauge-card` — monthly circular view with optional calendar editing.
