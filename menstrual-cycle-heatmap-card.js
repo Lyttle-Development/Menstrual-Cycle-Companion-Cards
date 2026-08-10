@@ -1,4 +1,4 @@
-import { cardLanguage, translateCard } from './menstrual-cycle-card-translations.js';
+import { cardLanguage, ensureCardTranslations, translateCard } from './menstrual-cycle-card-translations.js';
 
 class MenstrualCycleHeatmapCard extends HTMLElement {
   static getStubConfig() {
@@ -270,6 +270,13 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     }
     this._ensureRoot();
     if (!this._config || !this.shadowRoot) return;
+    const language = this._lang();
+    if (this._translationsLanguage !== language) {
+      ensureCardTranslations(this._hass).then(() => {
+        this._translationsLanguage = language;
+        this._render();
+      });
+    }
 
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;

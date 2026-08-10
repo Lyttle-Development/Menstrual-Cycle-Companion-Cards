@@ -1,5 +1,5 @@
 import './menstrual-cycle-heatmap-card.js';
-import { cardLanguage, translateCard } from './menstrual-cycle-card-translations.js';
+import { cardLanguage, ensureCardTranslations, translateCard } from './menstrual-cycle-card-translations.js';
 
 class MenstrualCycleGaugeCard extends HTMLElement {
   static getStubConfig() {
@@ -748,6 +748,13 @@ class MenstrualCycleGaugeCard extends HTMLElement {
   _render() {
     this._ensureRoot();
     if (!this._config || !this._hass) return;
+    const language = this._lang();
+    if (this._translationsLanguage !== language) {
+      ensureCardTranslations(this._hass).then(() => {
+        this._translationsLanguage = language;
+        this._render();
+      });
+    }
 
     const model = this._buildModel();
     const palette = this._palette(model.state);
@@ -940,6 +947,13 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
   _render() {
     if (!this._config) return;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    const language = this._lang();
+    if (this._translationsLanguage !== language) {
+      ensureCardTranslations(this._hass).then(() => {
+        this._translationsLanguage = language;
+        this._render();
+      });
+    }
     const entities = this._entityOptions();
     const selectedEntity = String(this._config.entity || '');
     const hasHaSelector = Boolean(customElements.get('ha-selector'));
