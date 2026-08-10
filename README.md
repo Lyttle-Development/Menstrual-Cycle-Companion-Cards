@@ -34,8 +34,8 @@ underlines for each proposed phase, while confirmed bleeding days remain filled.
 4. Restart Home Assistant if HACS requests it.
 5. If the resources are not added automatically, go to **Settings → Dashboards → Resources** and add:
 
-   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-gauge-card.js` as **JavaScript module**
-   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-heatmap-card.js` as **JavaScript module**
+   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-gauge.js` as **JavaScript module**
+   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-heatmap.js` as **JavaScript module**
 
 For an unpublished repository, add this repository to HACS as a custom **Dashboard** repository.
 
@@ -96,7 +96,7 @@ The referenced sensor should expose a `dates`, `date_list`, or `history` attribu
 
 ## Manual installation
 
-Copy both JavaScript files into `/config/www/`, add them as JavaScript-module resources, and clear the browser cache. The integration must still be installed separately.
+Copy the branded JavaScript files you use into `/config/www/`, add them as JavaScript-module resources, and clear the browser cache. The integration must still be installed separately. If the integration is installed through HACS, it bundles the same files under its `www/` directory and registers them automatically; do not install both copies unless you need a standalone override. The old resource filenames remain compatibility loaders.
 
 ## Publishing
 
