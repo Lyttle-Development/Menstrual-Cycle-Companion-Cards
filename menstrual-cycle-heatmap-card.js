@@ -1,13 +1,43 @@
-class MenstrualCycleHeatmapCard extends HTMLElement {
+const _mcHeatmapCardI18n = window.menstruationCycleI18n || (window.menstruationCycleI18n = {
+  cache: {},
+  loading: {},
+  fallback: { en: {} },
+});
+
+if (typeof _mcHeatmapCardI18n.normalizeLang !== 'function') {
+  _mcHeatmapCardI18n.normalizeLang = (language) => String(language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
+}
+
+
+
+
+class MenstruationCycleHeatmapCard extends HTMLElement {
+  constructor() {
+    super();
+    this._heatmapCueObserver = null;
+    this._tooltipHeatmap = null;
+    this._tooltipMouseOverHandler = null;
+    this._tooltipMouseLeaveHandler = null;
+    this._scrollHeatmap = null;
+    this._scrollCueUpdateHandler = null;
+    this._lastRenderSignature = null;
+  }
+
+  static getConfigElement() {
+    return document.createElement('menstrual-cycle-heatmap-card-editor');
+  }
+
   static getStubConfig() {
     return {
       type: 'custom:menstrual-cycle-heatmap-card',
       entity: 'sensor.menstruation',
       entry_id: '',
-      title: 'Cycle Heatmap',
-      max_cycles: 30,
+      title: 'Zyklus Heatmap',
+      max_cycles: 18,
       period_duration_days: 5,
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       symptom_entities: [],
       cycle_alignment: 'top',
     };
@@ -18,60 +48,38 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       throw new Error('entity or entry_id is required');
     }
     this._config = {
-      max_cycles: 30,
+      max_cycles: 18,
       period_duration_days: 5,
-      title: 'Cycle Heatmap',
+      title: 'Zyklus Heatmap',
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       symptom_entities: [],
       cycle_alignment: 'top',
       ...config,
     };
+    this._lastRenderSignature = null;
     this._ensureRoot();
-    this._lastRenderedStateObj = null;
-    this._lastRenderedEntityId = null;
-    this._lastRenderedSymptomStates = null;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._scheduleRender();
-  }
-
-  _configuredSymptomStateObjects() {
-    const states = this._hass?.states || {};
-    const rawConfig = Array.isArray(this._config?.symptom_entities) ? this._config.symptom_entities : [];
-    return rawConfig.map((rawItem) => {
-      const item = typeof rawItem === 'string' ? { entity: rawItem } : (rawItem || {});
-      const entityId = String(item.entity || item.entity_id || '').trim();
-      return entityId ? states[entityId] : undefined;
-    });
-  }
-
-  _scheduleRender() {
-    if (this._renderFrame) return;
-    const render = () => {
-      this._renderFrame = null;
-      const entityId = this._resolveEntityId();
-      const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
-      const symptomStates = this._configuredSymptomStateObjects();
-      const symptomsUnchanged = Array.isArray(this._lastRenderedSymptomStates)
-        && symptomStates.length === this._lastRenderedSymptomStates.length
-        && symptomStates.every((state, index) => state === this._lastRenderedSymptomStates[index]);
-      if (entityId === this._lastRenderedEntityId
-        && stateObj === this._lastRenderedStateObj
-        && symptomsUnchanged) return;
-      this._render();
-    };
-    if (typeof requestAnimationFrame === 'function') {
-      this._renderFrame = requestAnimationFrame(render);
-    } else {
-      this._renderFrame = setTimeout(render, 0);
-    }
+    this._loadTranslations();
+    if (!this._config) return;
+    const signature = this._computeRenderSignature(hass);
+    if (signature === this._lastRenderSignature) return;
+    this._lastRenderSignature = signature;
+    this._render();
   }
 
   getCardSize() {
     return 4;
+  }
+
+  disconnectedCallback() {
+    this._unbindTooltipEvents();
+    this._unbindHeatmapScrollCues();
   }
 
   _ensureRoot() {
@@ -80,12 +88,23 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     }
   }
 
+  _loadTranslations() {
+    const lang = this._lang();
+    if (_mcHeatmapCardI18n.cache[lang] || _mcHeatmapCardI18n.loading[lang]) return;
+    if (typeof _mcHeatmapCardI18n.load !== 'function') return;
+    _mcHeatmapCardI18n.load(lang).then(() => this._render()).catch(() => {});
+  }
+
   _lang() {
-    return 'en';
+    const language = this._hass?.locale?.language || this._hass?.language || 'en';
+    return _mcHeatmapCardI18n.normalizeLang(language);
   }
 
   _t(key) {
+    const loaded = window.menstruationCycleI18n?.cache?.[this._lang()] || {};
+    if (loaded[key] !== undefined) return loaded[key];
     const i18n = {
+      en: {
         entity_not_found: 'Entity not found',
         unknown: 'unknown',
         too_little_history: 'Not enough history data in',
@@ -101,12 +120,56 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         legend_alignment_bottom: 'Alignment: cycle end (E/-days)',
         legend_alignment_top: 'Alignment: cycle start (day 1..X)',
         scroll: 'scroll',
+        // Symptom category labels
+        bleeding_strength: 'Bleeding',
+        spotting: 'Spotting',
+        tt_intercourse: 'Intercourse',
+        pain: 'Pain',
+        tab_hygiene: 'Hygiene',
+        cat_test: 'Test',
+        cervical_mucus: 'Cervical Mucus',
+        cat_basal_temp: 'Basal Temp.',
+        // Symptom option labels
+        opt_light: 'Light',
+        nfp_confidence_medium: 'Medium',
+        bleeding_heavy: 'Heavy',
+        opt_very_heavy: 'Very Heavy',
+        opt_red: 'Red',
+        opt_brown: 'Brown',
+        opt_protected: 'Protected',
+        opt_unprotected: 'Unprotected',
+        opt_mittelschmerz: 'Mittelschmerz',
+        opt_cramps: 'Cramps',
+        opt_tender_breasts: 'Tender Breasts',
+        opt_headache: 'Headache',
+        opt_migraine: 'Migraine',
+        opt_lower_back: 'Lower Back Pain',
+        opt_vulva: 'Vulva Pain',
+        pad_duration: 'Pad',
+        liner_duration: 'Liner',
+        tampon_duration: 'Tampon',
+        opt_cup: 'Cup',
+        underwear_duration: 'Period Underwear',
+        opt_positive_ovulation: 'LH Positive',
+        opt_negative_ovulation: 'LH Negative',
+        opt_positive_pregnancy: 'Pregnancy +',
+        opt_negative_pregnancy: 'Pregnancy -',
+        opt_keinen: 'None',
+        opt_klebrig: 'Sticky',
+        opt_cremig: 'Creamy',
+        opt_fadenziehend: 'Stretchy',
+        opt_untypisch: 'Atypical',
+      },
     };
-    return i18n[key] || key;
+    const val = i18n.en[key];
+    return val !== undefined ? val : (i18n.en[key] ?? key);
   }
 
   _resolveEntityId() {
-    const states = this._hass?.states || {};
+    return this._resolveEntityIdFromStates(this._hass?.states || {});
+  }
+
+  _resolveEntityIdFromStates(states) {
     const configuredEntity = String(this._config?.entity || '').trim();
     if (configuredEntity && states[configuredEntity]) return configuredEntity;
 
@@ -120,6 +183,51 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     }
 
     return configuredEntity || null;
+  }
+
+  _configSignature() {
+    const cfg = this._config || {};
+    return JSON.stringify({
+      entity: cfg.entity || '',
+      entry_id: cfg.entry_id || '',
+      max_cycles: Number(cfg.max_cycles || 18),
+      period_duration_days: Number(cfg.period_duration_days || 5),
+      title: String(cfg.title || ''),
+      show_fertile_period: cfg.show_fertile_period !== false,
+      show_predicted_cycles: cfg.show_predicted_cycles !== false,
+      num_predicted_cycles: Math.max(1, Math.min(12, Number(cfg.num_predicted_cycles || 6))),
+      cycle_alignment: String(cfg.cycle_alignment || 'top'),
+      symptom_entities: Array.isArray(cfg.symptom_entities) ? cfg.symptom_entities : [],
+    });
+  }
+
+  _stateVersion(stateObj, entityId) {
+    if (!stateObj) return `${entityId || ''}:missing`;
+    return `${entityId || ''}:${stateObj.state ?? ''}:${stateObj.last_changed || ''}:${stateObj.last_updated || ''}`;
+  }
+
+  _symptomSourcesSignature(states) {
+    const rawConfig = Array.isArray(this._config?.symptom_entities) ? this._config.symptom_entities : [];
+    return rawConfig.map((rawItem) => {
+      const item = typeof rawItem === 'string' ? { entity: rawItem } : (rawItem || {});
+      const entityId = String(item.entity || item.entity_id || '').trim();
+      if (!entityId) return 'missing:';
+      return this._stateVersion(states[entityId], entityId);
+    }).join('|');
+  }
+
+  _computeRenderSignature(hass) {
+    const states = hass?.states || {};
+    const entityId = this._resolveEntityIdFromStates(states);
+    const mainStateVersion = entityId ? this._stateVersion(states[entityId], entityId) : 'no-entity';
+    const lang = String(hass?.locale?.language || 'en');
+    return [
+      lang,
+      this._configSignature(),
+      entityId || '',
+      mainStateVersion,
+      this._symptomSourcesSignature(states),
+    ].join('||');
   }
 
   _normalizeISO(value) {
@@ -146,7 +254,8 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
   _toLocalDateLabel(iso) {
     const dt = this._parseISO(iso);
     if (!dt) return iso || '';
-    return new Intl.DateTimeFormat('en-US', {
+    const language = this._hass?.locale?.language || this._hass?.language || 'en';
+    return new Intl.DateTimeFormat(language, {
       day: '2-digit',
       month: '2-digit',
     }).format(dt);
@@ -163,9 +272,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     return starts;
   }
 
-  _buildCycles(groupedStarts, predictedNextStarts) {
+  _buildCycles(groupedStarts, predictedCycleStarts) {
     const starts = Array.from(new Set((groupedStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean))).sort();
-    if (starts.length < 2) return [];
+    if (starts.length < 1) return [];
 
     const cycles = [];
     for (let index = 0; index < starts.length - 1; index += 1) {
@@ -175,16 +284,17 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       if (length > 0 && length <= 80) cycles.push({ start, end, length, predicted: false });
     }
 
-    const lastStart = starts[starts.length - 1];
-    const predictions = Array.isArray(predictedNextStarts) ? predictedNextStarts : [predictedNextStarts];
-    let previousStart = lastStart;
-    predictions.forEach((rawPrediction) => {
-      const normalizedPrediction = this._normalizeISO(rawPrediction);
-      if (!normalizedPrediction || !previousStart) return;
-      const predictedLength = this._dayDiff(normalizedPrediction, previousStart);
-      if (predictedLength > 0 && predictedLength <= 80) {
-        cycles.push({ start: previousStart, end: normalizedPrediction, length: predictedLength, predicted: true });
-        previousStart = normalizedPrediction;
+    const normalizedPredictedStarts = Array.from(
+      new Set((predictedCycleStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean)),
+    ).sort();
+    let lastStart = starts[starts.length - 1];
+    normalizedPredictedStarts.forEach((predictedStart) => {
+      if (predictedStart && lastStart) {
+        const predictedLength = this._dayDiff(predictedStart, lastStart);
+        if (predictedLength > 0 && predictedLength <= 80) {
+          cycles.push({ start: lastStart, end: predictedStart, length: predictedLength, predicted: true });
+          lastStart = predictedStart;
+        }
       }
     });
 
@@ -240,18 +350,193 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     }).filter(Boolean);
   }
 
+  _symptomsForDate(symptomSources, dateIso) {
+    return (symptomSources || [])
+      .filter((source) => source.dates.has(dateIso))
+      .map((source) => ({
+        name: source.name,
+        icon: source.icon,
+        value: source.valuesByDate ? source.valuesByDate[dateIso] : undefined,
+      }));
+  }
+
+  _symptomConfig() {
+    return [
+      { key: 'bleeding_strength', icon: 'mdi:water-opacity' },
+      { key: 'spotting', icon: 'mdi:blood-bag' },
+      { key: 'intercourse', icon: 'mdi:heart' },
+      { key: 'pain', icon: 'mdi:emoticon-sad-outline' },
+      { key: 'hygiene', icon: 'mdi:medical-bag' },
+      { key: 'test', icon: 'mdi:test-tube' },
+      { key: 'basal_temp', icon: 'mdi:thermometer' },
+      { key: 'cervical_mucus', icon: 'mdi:water-circle-outline' },
+    ];
+  }
+
+  _resolveBuiltinSymptomSources() {
+    const entityId = this._resolveEntityId();
+    const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+    const attrs = stateObj?.attributes || {};
+    const symptomHistory = Array.isArray(attrs.symptom_history) ? [...attrs.symptom_history] : [];
+
+    if (!symptomHistory.length) {
+      const todayIso = this._normalizeISO(new Date().toISOString().slice(0, 10));
+      if (todayIso && attrs.symptom_data_today && typeof attrs.symptom_data_today === 'object') {
+        symptomHistory.push({ date: todayIso, ...attrs.symptom_data_today });
+      } else if (todayIso && attrs.symptom_data_this_cycle && typeof attrs.symptom_data_this_cycle === 'object') {
+        const cycleData = attrs.symptom_data_this_cycle;
+        symptomHistory.push({
+          date: todayIso,
+          bleeding_strength: cycleData.bleeding_strength,
+          spotting: cycleData.spotting,
+          intercourse: cycleData.intercourse,
+          pain: Array.isArray(cycleData.pain_types) ? cycleData.pain_types : cycleData.pain,
+          hygiene: Array.isArray(cycleData.hygiene_types) ? cycleData.hygiene_types : cycleData.hygiene,
+          test: Array.isArray(cycleData.test_types) ? cycleData.test_types : cycleData.test,
+          basal_temp: cycleData.basal_temp_average ?? cycleData.basal_temp,
+          cervical_mucus: cycleData.cervical_mucus,
+        });
+      }
+    }
+
+    if (!symptomHistory.length) return [];
+
+    const sources = [];
+    for (const cat of this._symptomConfig()) {
+      const dates = new Set();
+      const valuesByDate = {};
+      for (const entry of symptomHistory) {
+        const iso = this._normalizeISO(entry?.date);
+        if (!iso) continue;
+        const val = entry[cat.key];
+        if (val === null || val === undefined) continue;
+        if (Array.isArray(val) && val.length === 0) continue;
+        dates.add(iso);
+        valuesByDate[iso] = val;
+      }
+      if (dates.size > 0) sources.push({ name: cat.key, icon: cat.icon, dates, valuesByDate });
+    }
+    return sources;
+  }
 
   _phaseClass(day, cycleLength, showFertile) {
     if (!showFertile) return '';
-    const fertileStart = 8;
-    const fertileEnd = Math.min(19, cycleLength);
-    const ovulationDay = Math.min(Math.max(14, fertileStart), fertileEnd);
+    const cl = Math.max(20, Math.min(60, Math.round(cycleLength) || 28));
+    const ovulationDay = Math.floor(cl / 2);
+    const fertileStart = ovulationDay - 5;
+    const fertileEnd = ovulationDay + 1;
     if (day === ovulationDay) return 'is-ovulation';
     if (day >= fertileStart && day <= fertileEnd) return 'is-fertile';
     return '';
   }
 
+  _escAttr(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  _buildTooltipHTML(tooltip, data) {
+    tooltip.innerHTML = '';
+    const { cs, cd, cl, dbe, symptoms } = data;
+
+    const header = document.createElement('div');
+    header.className = 'tip-header';
+    header.textContent = `${this._t('cycle_start')}: ${cs}, ${this._t('day')} ${cd}/${cl}`;
+    tooltip.appendChild(header);
+
+    const sub = document.createElement('div');
+    sub.className = 'tip-sub';
+    sub.textContent = dbe === 0 ? this._t('end') : `${dbe} ${this._t('days_before_end')}`;
+    tooltip.appendChild(sub);
+
+    if (symptoms && symptoms.length) {
+      const label = document.createElement('div');
+      label.className = 'tip-symptoms-label';
+      label.textContent = `${this._t('symptoms')}:`;
+      tooltip.appendChild(label);
+
+      const ul = document.createElement('ul');
+      ul.className = 'tip-symptoms';
+
+      for (const s of symptoms) {
+        const li = document.createElement('li');
+        li.className = 'tip-symptom';
+
+        const icon = document.createElement('ha-icon');
+        icon.className = 'tip-icon';
+        icon.setAttribute('icon', String(s.i || ''));
+        li.appendChild(icon);
+
+        const catKey = `cat_${s.k}`;
+        const catLabel = this._t(catKey) !== catKey ? this._t(catKey) : String(s.k || '').replace(/_/g, ' ');
+        const valArr = Array.isArray(s.v) ? s.v : (s.v !== null && s.v !== undefined && s.v !== '' ? [String(s.v)] : []);
+        const valLabel = valArr
+          .map((v) => { const ok = `opt_${v}`; const t = this._t(ok); return t !== ok ? t : String(v).replace(/_/g, ' '); })
+          .filter(Boolean)
+          .join(', ');
+
+        const span = document.createElement('span');
+        span.textContent = valLabel ? `${catLabel}: ${valLabel}` : catLabel;
+        li.appendChild(span);
+
+        ul.appendChild(li);
+      }
+
+      tooltip.appendChild(ul);
+    }
+  }
+
+  _bindTooltipEvents() {
+    this._unbindTooltipEvents();
+    const root = this.shadowRoot;
+    if (!root) return;
+    const heatmap = root.querySelector('.heatmap');
+    const tooltip = root.getElementById('mg-tooltip');
+    if (!heatmap || !tooltip) return;
+
+    const show = (cell) => {
+      const tipJson = cell.getAttribute('data-tip');
+      if (!tipJson) return;
+      let data;
+      try { data = JSON.parse(tipJson); } catch { return; }
+      tooltip.innerHTML = '';
+      this._buildTooltipHTML(tooltip, data);
+      tooltip.style.display = 'block';
+      const rect = cell.getBoundingClientRect();
+      const tipRect = tooltip.getBoundingClientRect();
+      let left = rect.left + rect.width / 2 - tipRect.width / 2;
+      let top = rect.bottom + 6;
+      if (top + tipRect.height > window.innerHeight - 8) top = rect.top - tipRect.height - 6;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    };
+
+    const hide = () => { tooltip.style.display = 'none'; };
+
+    this._tooltipMouseOverHandler = (e) => {
+      const cell = e.target.closest && e.target.closest('.cell:not(.spacer)');
+      if (cell) show(cell);
+    };
+    this._tooltipMouseLeaveHandler = hide;
+    this._tooltipHeatmap = heatmap;
+    heatmap.addEventListener('mouseover', this._tooltipMouseOverHandler);
+    heatmap.addEventListener('mouseleave', this._tooltipMouseLeaveHandler);
+  }
+
+  _unbindTooltipEvents() {
+    if (this._tooltipHeatmap && this._tooltipMouseOverHandler) {
+      this._tooltipHeatmap.removeEventListener('mouseover', this._tooltipMouseOverHandler);
+    }
+    if (this._tooltipHeatmap && this._tooltipMouseLeaveHandler) {
+      this._tooltipHeatmap.removeEventListener('mouseleave', this._tooltipMouseLeaveHandler);
+    }
+    this._tooltipHeatmap = null;
+    this._tooltipMouseOverHandler = null;
+    this._tooltipMouseLeaveHandler = null;
+  }
+
   _bindHeatmapScrollCues() {
+    this._unbindHeatmapScrollCues();
     const root = this.shadowRoot;
     if (!root) return;
     const wrap = root.querySelector('.heatmap-wrap');
@@ -269,6 +554,8 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       cueRight.classList.toggle('active', hasOverflow && canRight);
     };
 
+    this._scrollHeatmap = heatmap;
+    this._scrollCueUpdateHandler = update;
     heatmap.addEventListener('scroll', update, { passive: true });
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(update);
@@ -278,11 +565,21 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     requestAnimationFrame(update);
   }
 
-  _render() {
+  _unbindHeatmapScrollCues() {
+    if (this._scrollHeatmap && this._scrollCueUpdateHandler) {
+      this._scrollHeatmap.removeEventListener('scroll', this._scrollCueUpdateHandler);
+    }
+    this._scrollHeatmap = null;
+    this._scrollCueUpdateHandler = null;
     if (this._heatmapCueObserver) {
       this._heatmapCueObserver.disconnect();
       this._heatmapCueObserver = null;
     }
+  }
+
+  _render() {
+    this._unbindTooltipEvents();
+    this._unbindHeatmapScrollCues();
     this._ensureRoot();
     if (!this._config || !this.shadowRoot) return;
 
@@ -294,9 +591,6 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           <div class="pad">${this._t('entity_not_found')}: ${this._config.entity || this._config.entry_id || this._t('unknown')}</div>
         </ha-card>
       `;
-      this._lastRenderedEntityId = entityId;
-      this._lastRenderedStateObj = stateObj;
-      this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
       return;
     }
 
@@ -304,9 +598,16 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     const history = Array.isArray(attrs.history) ? attrs.history : [];
     const groupedStartsAttr = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
     const groupedStarts = groupedStartsAttr.length ? groupedStartsAttr : this._startsFromHistory(history);
-    const predictedCycleStarts = Array.isArray(attrs.predicted_cycle_starts)
-      ? attrs.predicted_cycle_starts
-      : [attrs.next_predicted_start || null];
+    const showPredictedCycles = this._config.show_predicted_cycles !== false;
+    const maxPredictedCycles = Math.max(1, Math.min(12, Number(this._config.num_predicted_cycles || 6)));
+    const predictedStarts = Array.isArray(attrs.predicted_cycle_starts) ? attrs.predicted_cycle_starts : [];
+    const normalizedNextPredicted = this._normalizeISO(attrs.next_predicted_start || null);
+    const predictedCycleStarts = showPredictedCycles
+      ? predictedStarts.slice(0, maxPredictedCycles)
+      : [];
+    if (showPredictedCycles && predictedCycleStarts.length === 0 && normalizedNextPredicted) {
+      predictedCycleStarts.push(normalizedNextPredicted);
+    }
     const cycles = this._buildCycles(groupedStarts, predictedCycleStarts);
 
     const maxCycles = Math.max(1, Number(this._config.max_cycles || 18));
@@ -316,13 +617,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
     const sensorPeriodDays = Number(attrs.period_duration_days || 5);
     const periodDays = Math.max(1, Math.min(14, Number(this._config.period_duration_days || sensorPeriodDays || 5)));
     const showFertile = this._config.show_fertile_period !== false;
-    const symptomSources = this._resolveSymptomSources();
-    const symptomsByDate = new Map();
-    symptomSources.forEach((source) => source.dates.forEach((dateIso) => {
-      const symptoms = symptomsByDate.get(dateIso) || [];
-      symptoms.push(source);
-      symptomsByDate.set(dateIso, symptoms);
-    }));
+    const symptomSources = [...this._resolveSymptomSources(), ...this._resolveBuiltinSymptomSources()];
     const todayIso = this._normalizeISO(new Date().toISOString().slice(0, 10));
     const alignMode = String(this._config.cycle_alignment || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
 
@@ -335,9 +630,6 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           <div class="pad">${this._t('too_little_history')} <code>grouped_starts/history</code>.</div>
         </ha-card>
       `;
-      this._lastRenderedEntityId = entityId;
-      this._lastRenderedStateObj = stateObj;
-      this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
       return;
     }
 
@@ -366,15 +658,15 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         const dayIso = this._addDaysISO(cycle.start, cycleDay - 1);
         if (dayIso && todayIso && dayIso > todayIso) classes.push('is-future');
         if (dayIso && todayIso && dayIso === todayIso) classes.push('is-today');
-        const symptoms = symptomsByDate.get(dayIso) || [];
+        const symptoms = this._symptomsForDate(symptomSources, dayIso);
         if (symptoms.length) classes.push('has-symptom');
-        const symptomInfo = symptoms.length ? ` | ${this._t('symptoms')}: ${symptoms.map((item) => item.name).join(', ')}` : '';
         const daysBeforeEnd = cycle.length - cycleDay;
-        const tooltip = `${this._t('cycle_start')} ${cycle.start}, ${this._t('day')} ${cycleDay}/${cycle.length} | ${daysBeforeEnd === 0 ? this._t('end') : `${daysBeforeEnd} ${this._t('days_before_end')}`}${symptomInfo}`;
+        const plainTooltip = `${this._t('cycle_start')} ${cycle.start}, ${this._t('day')} ${cycleDay}/${cycle.length} | ${daysBeforeEnd === 0 ? this._t('end') : `${daysBeforeEnd} ${this._t('days_before_end')}`}${symptoms.length ? ` | ${this._t('symptoms')}: ${symptoms.map((s) => s.name).join(', ')}` : ''}`;
+        const tipData = { cs: cycle.start, cd: cycleDay, cl: cycle.length, dbe: daysBeforeEnd, symptoms: symptoms.map((s) => ({ k: s.name, i: s.icon, v: s.value })) };
         const symptomIconHtml = symptoms.length
           ? `<span class="symptom-wrap"><ha-icon class="symptom-icon" icon="${symptoms[0].icon}"></ha-icon>${symptoms.length > 1 ? `<span class="symptom-count">${symptoms.length}</span>` : ''}</span>`
           : '';
-        return `<div class="${classes.join(' ')}" title="${tooltip}">${symptomIconHtml}</div>`;
+        return `<div class="${classes.join(' ')}" title="${this._escAttr(plainTooltip)}" data-tip="${this._escAttr(JSON.stringify(tipData))}">${symptomIconHtml}</div>`;
       }).join('');
 
       const predictedClass = cycle.predicted ? ' predicted' : '';
@@ -387,15 +679,21 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
+        :host {
+          display: block;
+          --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+        }
         ha-card {
           --cell-size: 11px;
           --cell-gap: 2px;
-          padding: 16px;
+          padding: 12px;
+          background: var(--mg-card-bg);
+          border: 1px solid var(--mg-border);
         }
         .title {
           font-weight: 600;
-          margin: 0 0 12px;
+          margin: 2px 0 10px;
           color: var(--primary-text-color);
         }
         .wrap {
@@ -448,11 +746,11 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         }
         .scroll-cue.left {
           left: 0;
-          background: linear-gradient(90deg, var(--card-background-color, #fff) 18%, rgba(255, 255, 255, 0));
+          background: linear-gradient(90deg, var(--mg-card-bg) 18%, transparent);
         }
         .scroll-cue.right {
           right: 0;
-          background: linear-gradient(270deg, var(--card-background-color, #fff) 18%, rgba(255, 255, 255, 0));
+          background: linear-gradient(270deg, var(--mg-card-bg) 18%, transparent);
         }
         .scroll-cue.active { opacity: 0.92; }
         .heatmap-wrap.is-scrollable::after {
@@ -482,21 +780,21 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           height: var(--cell-size);
           border-radius: 2px;
           background: transparent;
-          border: 1px solid rgba(120, 120, 120, 0.35);
+          border: 1px solid var(--mg-border);
           box-sizing: border-box;
           position: relative;
           overflow: hidden;
         }
         .spacer { visibility: hidden; }
-        .is-period-window { background: rgba(190, 18, 60, 0.14); }
+        .is-period-window { background: color-mix(in srgb, var(--error-color, #be123c) 16%, transparent); }
         .is-period-day {
           background:
             radial-gradient(circle at 36% 28%, rgba(255,255,255,0.52) 0 16%, transparent 17%),
-            linear-gradient(165deg, #9f1239, #e11d48);
-          box-shadow: inset 0 0 0 1px rgba(136, 19, 55, 0.18);
+            linear-gradient(165deg, color-mix(in srgb, var(--error-color, #be123c) 78%, #50051f), color-mix(in srgb, var(--error-color, #be123c) 92%, #ff4f7a));
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--error-color, #be123c) 30%, transparent);
         }
-        .is-fertile { background: rgba(250, 204, 21, 0.45); }
-        .is-ovulation { background: rgba(22, 163, 74, 0.55); }
+        .is-fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 50%, transparent); }
+        .is-ovulation { background: color-mix(in srgb, var(--success-color, #16a34a) 58%, transparent); }
         .is-future {
           opacity: 0.42;
           filter: saturate(0.7);
@@ -531,9 +829,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           font-size: 6px;
           line-height: 8px;
           text-align: center;
-          background: var(--card-background-color, #fff);
+          background: var(--mg-card-bg);
           color: var(--secondary-text-color);
-          border: 1px solid rgba(120, 120, 120, 0.4);
+          border: 1px solid var(--mg-border);
           box-sizing: border-box;
         }
         .legend {
@@ -554,6 +852,68 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           height: 10px;
           border-radius: 2px;
         }
+        @media (prefers-color-scheme: dark) {
+          .is-period-window { background: color-mix(in srgb, var(--error-color, #ff6b89) 26%, transparent); }
+          .is-period-day {
+            background:
+              radial-gradient(circle at 36% 28%, rgba(255,255,255,0.4) 0 16%, transparent 17%),
+              linear-gradient(165deg, color-mix(in srgb, var(--error-color, #ff6b89) 74%, #2f0816), color-mix(in srgb, var(--error-color, #ff6b89) 90%, #ff7f9a));
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--error-color, #ff6b89) 38%, transparent);
+          }
+          .is-fertile { background: color-mix(in srgb, var(--warning-color, #ffd45a) 62%, transparent); }
+          .is-ovulation { background: color-mix(in srgb, var(--success-color, #4ade80) 68%, transparent); }
+          .is-today { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mg-card-bg) 20%, white); }
+        }
+        #mg-tooltip {
+          display: none;
+          position: fixed;
+          z-index: 9999;
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.35));
+          border-radius: 8px;
+          padding: 10px 12px;
+          min-width: 160px;
+          max-width: 280px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+          pointer-events: none;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .tip-header {
+          font-weight: 600;
+          margin-bottom: 2px;
+        }
+        .tip-sub {
+          color: var(--secondary-text-color);
+          font-size: 11px;
+          margin-bottom: 6px;
+        }
+        .tip-symptoms-label {
+          font-weight: 500;
+          margin-bottom: 4px;
+          border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.25));
+          padding-top: 6px;
+        }
+        .tip-symptoms {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tip-symptom {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tip-icon {
+          --mdc-icon-size: 14px;
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+        }
       </style>
       <ha-card>
         <div class="title">${this._config.title}</div>
@@ -573,21 +933,375 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
           <span class="legend-item">${alignMode === 'bottom' ? this._t('legend_alignment_bottom') : this._t('legend_alignment_top')}</span>
         </div>
       </ha-card>
+      <div id="mg-tooltip"></div>
     `;
     this._bindHeatmapScrollCues();
-    this._lastRenderedEntityId = entityId;
-    this._lastRenderedStateObj = stateObj;
-    this._lastRenderedSymptomStates = this._configuredSymptomStateObjects();
+    this._bindTooltipEvents();
   }
 }
 
+class MenstruationCycleHeatmapCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = {
+      max_cycles: 18,
+      show_fertile_period: true,
+      symptom_entities: [],
+      cycle_alignment: 'top',
+      ...config,
+    };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._loadTranslations();
+    if (this.shadowRoot?.activeElement) return;
+    this._render();
+  }
+
+  _loadTranslations() {
+    const lang = this._lang();
+    if (_mcHeatmapCardI18n.cache[lang] || _mcHeatmapCardI18n.loading[lang]) return;
+    if (typeof _mcHeatmapCardI18n.load !== 'function') return;
+    _mcHeatmapCardI18n.load(lang).then(() => this._render()).catch(() => {});
+  }
+
+  _lang() {
+    const language = this._hass?.locale?.language || this._hass?.language || 'en';
+    return _mcHeatmapCardI18n.normalizeLang(language);
+  }
+
+  _t(key) {
+    const loaded = window.menstruationCycleI18n?.cache?.[this._lang()] || {};
+    if (loaded[key] !== undefined) return loaded[key];
+    const i18n = {
+      en: {
+        entity: 'Entity',
+        entry_id: 'Entry ID (optional)',
+        display: 'Display',
+        title: 'Title',
+        max_cycles: 'Max Cycles',
+        features: 'Features',
+        show_fertile_period: 'Show fertile period',
+        alignment: 'Alignment',
+        align_top: 'Top (Day 1..X)',
+        align_bottom: 'Bottom (E/-days)',
+        symptom_entities: 'Symptom Entities',
+        symptom_entities_hint: 'Select sensor entities to track as symptoms on the heatmap.',
+        preview: 'Preview',
+        preview_note: 'Preview uses sample data.',
+        fallback_note: 'HA entity picker unavailable, fallback dropdown active.',
+        sensor_search: 'Search sensor…',
+        no_sensors: 'No sensors found.',
+        day: 'D',
+        period: 'P',
+        fertile: 'F',
+      },
+    };
+    return (i18n[this._lang()]?.[key]) ?? (i18n.en[key] ?? key);
+  }
+
+  _emit(nextConfig) {
+    this._config = { ...nextConfig };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  _entityOptions() {
+    const states = this._hass?.states || {};
+    return Object.keys(states)
+      .filter((id) => id.startsWith('sensor.'))
+      .sort()
+      .map((id) => ({
+        entity_id: id,
+        label: String(states[id]?.attributes?.friendly_name || states[id]?.attributes?.name || id),
+      }));
+  }
+
+  _entityOptionsHtml(options, selected) {
+    return options.map((row) => {
+      const sel = row.entity_id === selected ? 'selected' : '';
+      return `<option value="${row.entity_id}" ${sel}>${this._escapeHtml(row.label)} (${row.entity_id})</option>`;
+    }).join('');
+  }
+
+  _escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  _buildPreview() {
+    const maxCols = Math.min(Number(this._config.max_cycles) || 18, 8);
+    const cycleLen = 28;
+    const periodDays = 5;
+    const alignment = String(this._config.cycle_alignment || 'top').toLowerCase();
+    const showFertile = this._config.show_fertile_period !== false;
+
+    const cellSize = 8;
+    const gap = 1;
+    const colGap = 4;
+    const colWidth = cellSize;
+    const totalRows = cycleLen;
+
+    let cols = '';
+    for (let c = 0; c < maxCols; c++) {
+      let cells = '';
+      for (let r = 0; r < totalRows; r++) {
+        let day;
+        if (alignment === 'bottom') {
+          day = cycleLen - (totalRows - 1 - r);
+        } else {
+          day = r + 1;
+        }
+        let bg = 'var(--divider-color, #e0e0e0)';
+        if (day >= 1 && day <= periodDays) bg = '#be123c';
+        else if (showFertile && day >= 8 && day <= 19) bg = '#16a34a';
+        else if (showFertile && day === 14) bg = '#15803d';
+        cells += `<div style="width:${cellSize}px;height:${cellSize}px;border-radius:2px;background:${bg};margin-bottom:${gap}px;"></div>`;
+      }
+      cols += `<div style="display:flex;flex-direction:column;margin-right:${colGap}px;">${cells}</div>`;
+    }
+
+    return `
+      <div style="display:flex;flex-direction:row;overflow:hidden;max-width:100%;padding:4px;">
+        ${cols}
+      </div>
+      <div style="font-size:10px;color:var(--secondary-text-color);margin-top:4px;">${this._t('preview_note')}</div>
+    `;
+  }
+
+  _render() {
+    if (!this._config) return;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+
+    const entities = this._entityOptions();
+    const selectedEntity = String(this._config.entity || '');
+    const entryId = String(this._config.entry_id || '');
+    const maxCycles = Number(this._config.max_cycles) || 18;
+    const showFertile = this._config.show_fertile_period !== false;
+    const alignment = String(this._config.cycle_alignment || 'top').toLowerCase();
+    const symptomEntities = Array.isArray(this._config.symptom_entities) ? this._config.symptom_entities : [];
+
+    const hasHaSelector = Boolean(customElements.get('ha-selector'));
+    const hasHaEntityPicker = Boolean(customElements.get('ha-entity-picker'));
+
+    const entityPickerHtml = hasHaSelector
+      ? '<ha-selector id="entity_selector"></ha-selector>'
+      : hasHaEntityPicker
+      ? '<ha-entity-picker id="entity_picker"></ha-entity-picker>'
+      : `<div class="entity-fallback">
+           <input id="entity_search" type="text" placeholder="${this._t('sensor_search')}">
+           <select id="entity_select" size="5">${this._entityOptionsHtml(entities, selectedEntity)}</select>
+           <div class="fallback-note">${this._t('fallback_note')}</div>
+         </div>`;
+
+    const symptomCheckboxes = entities.map((row) => {
+      const checked = symptomEntities.includes(row.entity_id) ? 'checked' : '';
+      return `<label class="check symptom-item">
+        <input type="checkbox" class="symptom-cb" data-entity="${row.entity_id}" ${checked}>
+        <span>${this._escapeHtml(row.label)} <small>(${row.entity_id})</small></span>
+      </label>`;
+    }).join('') || `<div style="color:var(--secondary-text-color);font-size:12px;">${this._t('no_sensors')}</div>`;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        .wrap { display: grid; gap: 14px; padding: 2px 0; }
+        .section-title { font-size: 12px; font-weight: 700; color: var(--secondary-text-color); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+        .row { display: grid; gap: 4px; }
+        label { font-size: 12px; font-weight: 600; color: var(--secondary-text-color); }
+        input[type='text'], input[type='number'], select {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 8px 10px;
+          border: 1px solid var(--divider-color);
+          border-radius: 8px;
+          background: var(--card-background-color);
+          color: var(--primary-text-color);
+          font-size: 14px;
+        }
+        .check { display: flex; gap: 8px; align-items: center; color: var(--primary-text-color); font-size: 13px; }
+        .check input[type='checkbox'] { width: auto; min-width: 0; margin: 0; }
+        .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+        input[type='range'] { width: 100%; }
+        .slider-val { font-size: 13px; font-weight: 600; color: var(--primary-text-color); min-width: 28px; text-align: right; }
+        .radio-group { display: flex; flex-direction: column; gap: 6px; }
+        .radio-label { display: flex; gap: 8px; align-items: center; color: var(--primary-text-color); font-size: 13px; font-weight: normal; }
+        .symptom-list { max-height: 160px; overflow-y: auto; border: 1px solid var(--divider-color); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .symptom-item { font-weight: normal; }
+        .symptom-item small { color: var(--secondary-text-color); font-size: 10px; }
+        .fallback-note { font-size: 11px; color: var(--secondary-text-color); opacity: 0.85; }
+        .entity-fallback { display: grid; gap: 6px; }
+        .preview-box { border: 1px solid var(--divider-color); border-radius: 8px; padding: 10px; background: var(--card-background-color); }
+        ha-selector, ha-entity-picker { width: 100%; display: block; }
+      </style>
+      <div class="wrap">
+        <div>
+          <div class="section-title">${this._t('entity')}</div>
+          <div class="row">
+            ${entityPickerHtml}
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <label for="entry_id">${this._t('entry_id')}</label>
+            <input id="entry_id" type="text" value="${this._escapeHtml(entryId)}" placeholder="">
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">${this._t('display')}</div>
+          <div class="row">
+            <label for="title">${this._t('title')}</label>
+            <input id="title" type="text" value="${this._escapeHtml(this._config.title || '')}" placeholder="Zyklus Heatmap">
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <label>${this._t('max_cycles')} (1-50)</label>
+            <div class="slider-row">
+              <input id="max_cycles" type="range" min="1" max="50" value="${maxCycles}">
+              <span class="slider-val" id="max_cycles_val">${maxCycles}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">${this._t('features')}</div>
+          <label class="check">
+            <input id="show_fertile_period" type="checkbox" ${showFertile ? 'checked' : ''}>
+            <span>${this._t('show_fertile_period')}</span>
+          </label>
+        </div>
+
+        <div>
+          <div class="section-title">${this._t('alignment')}</div>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input id="align_top" type="radio" name="cycle_alignment" value="top" ${alignment === 'top' ? 'checked' : ''}>
+              <span>${this._t('align_top')}</span>
+            </label>
+            <label class="radio-label">
+              <input id="align_bottom" type="radio" name="cycle_alignment" value="bottom" ${alignment === 'bottom' ? 'checked' : ''}>
+              <span>${this._t('align_bottom')}</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">${this._t('symptom_entities')}</div>
+          <div style="font-size:11px;color:var(--secondary-text-color);margin-bottom:6px;">${this._t('symptom_entities_hint')}</div>
+          <div class="symptom-list">${symptomCheckboxes}</div>
+        </div>
+
+        <div>
+          <div class="section-title">${this._t('preview')}</div>
+          <div class="preview-box">${this._buildPreview()}</div>
+        </div>
+      </div>
+    `;
+
+    // ── Entity picker wiring ──────────────────────────────────────────────
+    const applyEntity = (value) => {
+      const v = String(value || '').trim();
+      if (!v) return;
+      const next = { ...this._config, entity: v };
+      delete next.entry_id;
+      this._emit(next);
+    };
+
+    const entitySelector = this.shadowRoot.getElementById('entity_selector');
+    if (entitySelector) {
+      entitySelector.hass = this._hass;
+      entitySelector.selector = { entity: { domain: 'sensor' } };
+      entitySelector.value = selectedEntity;
+      entitySelector.addEventListener('value-changed', (ev) => applyEntity(ev?.detail?.value));
+      entitySelector.addEventListener('change', (ev) => applyEntity(ev?.detail?.value));
+    }
+
+    const entityPicker = this.shadowRoot.getElementById('entity_picker');
+    if (entityPicker) {
+      entityPicker.hass = this._hass;
+      entityPicker.value = selectedEntity;
+      entityPicker.includeDomains = ['sensor'];
+      entityPicker.allowCustomEntity = false;
+      entityPicker.addEventListener('value-changed', (ev) => applyEntity(ev?.detail?.value));
+      entityPicker.addEventListener('change', (ev) => applyEntity(ev?.detail?.value));
+    }
+
+    const entitySelect = this.shadowRoot.getElementById('entity_select');
+    const entitySearch = this.shadowRoot.getElementById('entity_search');
+    if (entitySelect) {
+      entitySelect.addEventListener('change', (ev) => applyEntity(ev?.target?.value));
+      entitySearch?.addEventListener('input', (ev) => {
+        const needle = String(ev?.target?.value || '').trim().toLowerCase();
+        const filtered = needle
+          ? entities.filter((r) => `${r.label} ${r.entity_id}`.toLowerCase().includes(needle))
+          : entities;
+        entitySelect.innerHTML = this._entityOptionsHtml(filtered, selectedEntity);
+      });
+      entitySearch?.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); applyEntity(entitySelect?.value); }
+      });
+    }
+
+    // ── Entry ID ─────────────────────────────────────────────────────────
+    this.shadowRoot.getElementById('entry_id')?.addEventListener('change', (ev) => {
+      const v = String(ev.target?.value || '').trim();
+      this._emit({ ...this._config, entry_id: v });
+    });
+
+    // ── Title ─────────────────────────────────────────────────────────────
+    this.shadowRoot.getElementById('title')?.addEventListener('change', (ev) => {
+      this._emit({ ...this._config, title: String(ev.target?.value || '') });
+    });
+
+    // ── Max cycles slider ─────────────────────────────────────────────────
+    const maxCyclesInput = this.shadowRoot.getElementById('max_cycles');
+    const maxCyclesVal = this.shadowRoot.getElementById('max_cycles_val');
+    maxCyclesInput?.addEventListener('input', (ev) => {
+      const v = Number(ev.target?.value);
+      if (maxCyclesVal) maxCyclesVal.textContent = v;
+    });
+    maxCyclesInput?.addEventListener('change', (ev) => {
+      this._emit({ ...this._config, max_cycles: Number(ev.target?.value) });
+    });
+
+    // ── Show fertile period ───────────────────────────────────────────────
+    this.shadowRoot.getElementById('show_fertile_period')?.addEventListener('change', (ev) => {
+      this._emit({ ...this._config, show_fertile_period: Boolean(ev.target?.checked) });
+    });
+
+    // ── Cycle alignment radios ────────────────────────────────────────────
+    this.shadowRoot.querySelectorAll('input[name="cycle_alignment"]').forEach((radio) => {
+      radio.addEventListener('change', (ev) => {
+        if (ev.target?.checked) {
+          this._emit({ ...this._config, cycle_alignment: ev.target?.value });
+        }
+      });
+    });
+
+    // ── Symptom entities checkboxes ───────────────────────────────────────
+    this.shadowRoot.querySelectorAll('.symptom-cb').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const checked = Array.from(this.shadowRoot.querySelectorAll('.symptom-cb'))
+          .filter((el) => el.checked)
+          .map((el) => el.dataset.entity);
+        this._emit({ ...this._config, symptom_entities: checked });
+      });
+    });
+  }
+}
+
+if (!customElements.get('menstrual-cycle-heatmap-card-editor')) {
+  customElements.define('menstrual-cycle-heatmap-card-editor', MenstruationCycleHeatmapCardEditor);
+}
 if (!customElements.get('menstrual-cycle-heatmap-card')) {
-  customElements.define('menstrual-cycle-heatmap-card', MenstrualCycleHeatmapCard);
+  customElements.define('menstrual-cycle-heatmap-card', MenstruationCycleHeatmapCard);
 }
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstrual-cycle-heatmap-card',
-  name: 'Menstrual Cycle Heatmap',
-  description: 'Cycle heatmap with one column per cycle and one cell per cycle day.',
+  name: 'Menstrual Cycle Companion Heatmap',
+  description: 'Heatmap mit einer Spalte pro Zyklus und einem Feld pro Zyklustag (grouped_starts kompatibel).',
 });
