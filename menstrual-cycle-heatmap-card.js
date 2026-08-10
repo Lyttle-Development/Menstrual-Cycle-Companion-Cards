@@ -1,3 +1,5 @@
+import { cardLanguage, translateCard } from './menstrual-cycle-card-translations.js';
+
 class MenstrualCycleHeatmapCard extends HTMLElement {
   static getStubConfig() {
     return {
@@ -81,28 +83,11 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
   }
 
   _lang() {
-    return 'en';
+    return cardLanguage(this._hass);
   }
 
   _t(key) {
-    const i18n = {
-        entity_not_found: 'Entity not found',
-        unknown: 'unknown',
-        too_little_history: 'Not enough history data in',
-        cycle_start: 'Start',
-        day: 'Day',
-        end: 'End',
-        days_before_end: 'days before end',
-        symptoms: 'Symptoms',
-        legend_actual_period: 'Actual period',
-        legend_period_window: 'Period window',
-        legend_fertile: 'Fertile (high probability, Standard Days/calendar method 8-19)',
-        legend_ovulation: 'Ovulation (high probability around day 14)',
-        legend_alignment_bottom: 'Alignment: cycle end (E/-days)',
-        legend_alignment_top: 'Alignment: cycle start (day 1..X)',
-        scroll: 'scroll',
-    };
-    return i18n[key] || key;
+    return translateCard(this._hass, key);
   }
 
   _resolveEntityId() {
@@ -146,7 +131,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
   _toLocalDateLabel(iso) {
     const dt = this._parseISO(iso);
     if (!dt) return iso || '';
-    return new Intl.DateTimeFormat('en-US', {
+     return new Intl.DateTimeFormat(this._lang(), {
       day: '2-digit',
       month: '2-digit',
     }).format(dt);
@@ -575,7 +560,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         }
       </style>
       <ha-card>
-        <div class="title">${this._config.title}</div>
+        <div class="title">${this._config.title === 'Cycle Heatmap' ? this._t('default_heatmap_title') : this._config.title}</div>
         <div class="wrap">
           <div class="y-axis">${yAxis}</div>
           <div class="heatmap-wrap">

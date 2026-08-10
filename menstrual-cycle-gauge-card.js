@@ -1,4 +1,5 @@
 import './menstrual-cycle-heatmap-card.js';
+import { cardLanguage, translateCard } from './menstrual-cycle-card-translations.js';
 
 class MenstrualCycleGaugeCard extends HTMLElement {
   static getStubConfig() {
@@ -77,12 +78,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
   }
 
   _lang() {
-    return 'en';
+    return cardLanguage(this._hass);
   }
 
-  _t(key) {
-    const i18n = { days_unit: 'days', days_unknown: '-- days' };
-    return i18n[key] || key;
+  _t(key, values = {}) {
+    return translateCard(this._hass, key, values);
   }
 
   _normalizeISO(value) {
@@ -432,7 +432,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
 
     const handA = this._polar(cx, cy, rInner - 2, handAngle);
     const handB = this._polar(cx, cy, rInner + extraBar - 2, handAngle);
-    const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(this._viewDate);
+    const monthLabel = new Intl.DateTimeFormat(this._lang(), { month: 'long' }).format(this._viewDate);
 
     return `
       <svg class="gauge" viewBox="0 0 420 420" role="img" aria-label="Menstrual Cycle gauge">
@@ -752,9 +752,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const model = this._buildModel();
     const palette = this._palette(model.state);
     this._lastCardWidth = this.getBoundingClientRect()?.width || 0;
-    const locale = 'en-US';
+    const locale = this._lang();
     const monthYear = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(this._viewDate);
-    const cardTitle = String(this._config.title || '').trim();
+    const configuredTitle = String(this._config.title || '').trim();
+    const cardTitle = configuredTitle === 'Cycle Gauge' ? this._t('default_gauge_title') : configuredTitle;
     const friendlyName = String(this._config.friendly_name || model.stateObj?.attributes?.friendly_name || '').trim();
     const canEdit = this._config?.calendar_edit_enabled !== false;
     const daysUntil = Number(model.stateObj?.attributes?.days_until_next_start);
@@ -767,8 +768,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       : 0;
     const variability = Number(model.stateObj?.attributes?.cycle_length_variability_days);
     const predictionNote = samples
-      ? `Personalized from ${samples} previous cycle${samples === 1 ? '' : 's'}${Number.isFinite(variability) && variability > 0 ? ` • typical variation ±${variability} days` : ''}`
-      : 'Using a default estimate until more cycle history is recorded';
+      ? `${this._t(samples === 1 ? 'personalized_one' : 'personalized_many', { count: samples })}${Number.isFinite(variability) && variability > 0 ? ` • ${this._t('typical_variation', { days: variability })}` : ''}`
+      : this._t('default_estimate');
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -831,13 +832,13 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
           </div>
           <div class="phase-legend">
-            <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>Menstruation</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>Follicular</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>${this._t('phase_menstruation')}</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>${this._t('phase_follicular')}</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>${this._t('phase_ovulation')}</span>
+            <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>${this._t('phase_luteal')}</span>
           </div>
           <div class="prediction-note">${predictionNote}</div>
-          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh</button></div>
+          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ ${this._t('refresh')}</button></div>
           ${this._config.show_editor && canEdit ? `
           <div class="editor">
             <div class="toolbar">
@@ -848,14 +849,14 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               </div>
             </div>
             ${String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range'
-              ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'} Right-click a saved range (or hold it on mobile) to delete it.</div>`
+              ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `${this._t('start_selected')} <strong>${this._rangeStart}</strong> ${this._t('click_end')}` : this._t('click_cycle_range')} ${this._t('delete_range')}</div>`
               : ''}
             <div class="grid">${this._calendarGrid(model, locale)}</div>
             <div class="phase-legend">
-              <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>Menstruation</span>
-              <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>Follicular</span>
-              <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
-              <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
+               <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>${this._t('phase_menstruation')}</span>
+               <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>${this._t('phase_follicular')}</span>
+               <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>${this._t('phase_ovulation')}</span>
+               <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>${this._t('phase_luteal')}</span>
             </div>
           </div>` : ''}
         </div>
@@ -890,30 +891,12 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
   }
 
   _lang() {
-    return 'en';
+    return cardLanguage(this._hass);
   }
 
   _t(key) {
-    const i18n = {
-        entity: 'Entity',
-        fallback_note: 'HA entity picker unavailable, fallback dropdown active.',
-        sensor_search: 'Search sensor...',
-        friendly_name: 'Friendly Name (Gauge)',
-        use_sensor_name: 'From sensor',
-        title: 'Title',
-        period_duration: 'Period Duration (number 1-14 or "learnt", empty = sensor value)',
-        period_placeholder: 'e.g. 5 or "learnt"',
-        theme: 'Theme',
-        theme_auto: 'auto',
-        theme_light: 'light',
-        theme_dark: 'dark',
-        show_fertile: 'Show fertile period',
-        calendar_edit: 'Allow new entries through calendar',
-        calendar_selection: 'Calendar date selection',
-        selection_range: 'Start and end date (range)',
-        selection_toggle: 'Single-day add/remove',
-    };
-    return i18n[key] || key;
+    const sharedKey = key.startsWith('theme_') || key.startsWith('selection_') ? key : `editor_${key}`;
+    return translateCard(this._hass, sharedKey);
   }
 
   _sensorLabelFromEntity(entityId) {
