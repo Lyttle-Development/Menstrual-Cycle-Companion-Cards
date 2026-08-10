@@ -10,10 +10,17 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 
 - `custom:menstrual-cycle-gauge-card` — monthly circular phase view with optional calendar editing.
 - `custom:menstrual-cycle-heatmap-card` — historical cycle comparison with period and fertile-window markers.
+- `custom:menstrual-calendar-card` — full calendar and daily symptom view.
+- `custom:menstrual-countdown-timer` — period countdown and symptom/product timer.
+- `custom:menstrual-cycle-card` — compact cycle overview.
+- `custom:menstrual-cycle-compact-status` — compact status display.
+- `custom:menstrual-cycle-history-card-row` — history row for dashboard layouts.
+- `custom:menstrual-product-inventory-card` — household product inventory.
+- `custom:menstrual-statistics-card` — cycle, symptom, and product statistics.
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
-The HACS gauge resource also loads and registers the heatmap card, so both card
-types are available even when HACS exposes only the primary gauge resource.
+The integration can register the resources automatically when installed through HACS;
+manual installations should add the JavaScript modules they use.
 
 The gauge's colored outer ring shows the proposed menstruation, follicular,
 ovulation, and luteal phases. The calendar editor uses matching colored
@@ -41,8 +48,9 @@ friendly_name: Anna
 title: Cycle gauge
 period_duration_days: learnt
 show_fertile_period: true
+show_predicted_cycles: true
+num_predicted_cycles: 6
 calendar_edit_enabled: true
-calendar_selection_mode: range
 theme_mode: auto
 ```
 
@@ -61,6 +69,8 @@ title: Cycle history
 max_cycles: 30
 period_duration_days: 5
 show_fertile_period: true
+show_predicted_cycles: true
+num_predicted_cycles: 6
 cycle_alignment: bottom
 ```
 
