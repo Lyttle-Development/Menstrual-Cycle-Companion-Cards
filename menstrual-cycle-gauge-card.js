@@ -169,7 +169,6 @@ class MenstruationGaugeCard extends HTMLElement {
         days_until_menarche: 'Days until menarche',
         menarche_expected_in: 'Menarche expected in {days} days',
         menarche_overdue: 'Menarche {days} days overdue',
-        pregnancy: 'Pregnancy',
         week: 'Week',
         month: 'Month',
         trimester: 'Trimester',
@@ -259,10 +258,6 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_training_moderate: 'Moderate',
         opt_training_intense: 'Intense',
         // Pregnancy symptom options
-        opt_nausea: 'Nausea',
-        opt_fatigue: 'Fatigue',
-        opt_heartburn: 'Heartburn',
-        opt_preg_swelling: 'Swelling',
         opt_back_pain: 'Back Pain',
         opt_nausea: 'Nausea',
         opt_preg_fatigue: 'Fatigue',
@@ -283,11 +278,6 @@ class MenstruationGaugeCard extends HTMLElement {
         welcome_period_features: 'New features: cycle prediction, statistics, ...',
         welcome_period_contraception: 'You are now fertile - think about contraception if needed!',
         welcome_period_return: 'You can always return to Pre-Menarche mode in Settings',
-        spotting: 'Spotting',
-        discharge: 'Discharge',
-        pain: 'Pain',
-        yes: 'Yes',
-        no: 'No',
         continue: 'Continue',
       },
     };
@@ -3139,6 +3129,18 @@ if (!customElements.get('menstrual-gauge-card')) {
 }
 if (!customElements.get('menstrual-gauge-card-editor')) {
   customElements.define('menstrual-gauge-card-editor', MenstruationGaugeCardEditor);
+}
+if (!customElements.get('menstrual-cycle-gauge-card')) {
+  customElements.define('menstrual-cycle-gauge-card', MenstruationGaugeCard);
+}
+if (!customElements.get('menstrual-cycle-gauge-card-editor')) {
+  customElements.define('menstrual-cycle-gauge-card-editor', MenstruationGaugeCardEditor);
+}
+if (!customElements.get('menstruation-gauge-card')) {
+  customElements.define('menstruation-gauge-card', MenstruationGaugeCard);
+}
+if (!customElements.get('menstruation-gauge-card-editor')) {
+  customElements.define('menstruation-gauge-card-editor', MenstruationGaugeCardEditor);
 }
 
 window.customCards = window.customCards || [];

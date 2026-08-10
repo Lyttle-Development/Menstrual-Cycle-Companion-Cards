@@ -8,7 +8,7 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 
 ## Included cards
 
-- `custom:menstrual-cycle-gauge-card` — monthly circular phase view with optional calendar editing.
+- `custom:menstrual-gauge-card` — monthly circular phase view with optional calendar editing.
 - `custom:menstrual-cycle-heatmap-card` — historical cycle comparison with period and fertile-window markers.
 - `custom:menstrual-calendar-card` — full calendar and daily symptom view.
 - `custom:menstrual-countdown-timer` — period countdown and symptom/product timer.
@@ -42,7 +42,7 @@ For an unpublished repository, add this repository to HACS as a custom **Dashboa
 ## Gauge card example
 
 ```yaml
-type: custom:menstrual-cycle-gauge-card
+type: custom:menstrual-gauge-card
 entity: sensor.anna
 friendly_name: Anna
 title: Cycle gauge
@@ -51,14 +51,17 @@ show_fertile_period: true
 show_predicted_cycles: true
 num_predicted_cycles: 6
 calendar_edit_enabled: true
+calendar_selection_mode: range
 theme_mode: auto
 ```
 
 Click **Show editor** or the countdown area to open the month calendar. In the
 default `range` mode, click the first day and then the last day of the cycle.
 The interval is highlighted while it is being selected and the completed range
-is shown with rounded start/end caps. Set `calendar_selection_mode: toggle` to
-use the original single-day add/remove behavior.
+is written as inclusive confirmed bleeding days and shown with rounded start/end
+caps. Right-click a saved day, or hold it on mobile, to remove its contiguous
+confirmed range. Set `calendar_selection_mode: toggle` to use single-day
+add/remove behavior.
 
 ## Heatmap example
 
