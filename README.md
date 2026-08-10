@@ -8,15 +8,15 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 
 ## Included cards
 
-- `custom:menstrual-gauge-card` — monthly circular phase view with optional calendar editing.
-- `custom:menstrual-cycle-heatmap-card` — historical cycle comparison with period and fertile-window markers.
-- `custom:menstrual-calendar-card` — full calendar and daily symptom view.
-- `custom:menstrual-countdown-timer` — period countdown and symptom/product timer.
-- `custom:menstrual-cycle-card` — compact cycle overview.
-- `custom:menstrual-cycle-compact-status` — compact status display.
-- `custom:menstrual-cycle-history-card-row` — history row for dashboard layouts.
-- `custom:menstrual-product-inventory-card` — household product inventory.
-- `custom:menstrual-statistics-card` — cycle, symptom, and product statistics.
+- `custom:menstrual-cycle-companion-gauge` — monthly circular phase view with optional calendar editing.
+- `custom:menstrual-cycle-companion-heatmap` — historical comparison with period and fertile-window markers.
+- `custom:menstrual-cycle-companion-calendar` — full calendar and daily symptom view.
+- `custom:menstrual-cycle-companion-countdown` — period countdown and symptom/product timer.
+- `custom:menstrual-cycle-companion-card` — compact overview.
+- `custom:menstrual-cycle-companion-compact-status` — compact status display.
+- `custom:menstrual-cycle-companion-history-row` — history row for dashboard layouts.
+- `custom:menstrual-cycle-companion-product-inventory` — household product inventory.
+- `custom:menstrual-cycle-companion-statistics` — cycle, symptom, and product statistics.
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
 The integration can register the resources automatically when installed through HACS;
@@ -42,7 +42,7 @@ For an unpublished repository, add this repository to HACS as a custom **Dashboa
 ## Gauge card example
 
 ```yaml
-type: custom:menstrual-gauge-card
+type: custom:menstrual-cycle-companion-gauge
 entity: sensor.anna
 friendly_name: Anna
 title: Cycle gauge
@@ -66,7 +66,7 @@ add/remove behavior.
 ## Heatmap example
 
 ```yaml
-type: custom:menstrual-cycle-heatmap-card
+type: custom:menstrual-cycle-companion-heatmap
 entity: sensor.anna
 title: Cycle history
 max_cycles: 30
