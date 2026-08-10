@@ -19,8 +19,9 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 - `custom:menstrual-cycle-companion-statistics` — cycle, symptom, and product statistics.
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
-The integration can register the resources automatically when installed through HACS;
-manual installations should add the JavaScript modules they use.
+Each card is an independent JavaScript module; install or register only the cards used by
+your dashboard. The integration provides the shared asset and translation endpoints, but
+does not bundle or automatically register card JavaScript.
 
 The gauge's colored outer ring shows the proposed menstruation, follicular,
 ovulation, and luteal phases. The calendar editor uses matching colored
@@ -32,7 +33,7 @@ underlines for each proposed phase, while confirmed bleeding days remain filled.
 2. Open **HACS → Frontend**.
 3. Search for **Menstrual Cycle Companion Cards** and install it.
 4. Restart Home Assistant if HACS requests it.
-5. If the resources are not added automatically, go to **Settings → Dashboards → Resources** and add:
+5. Go to **Settings → Dashboards → Resources** and add the branded JavaScript modules you use:
 
    - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-gauge.js` as **JavaScript module**
    - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-heatmap.js` as **JavaScript module**

@@ -3,14 +3,6 @@ const fs = require('fs');
 const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..');
-const bundleRoot = path.resolve(
-  repoRoot,
-  '..',
-  'Menstrual-Cycle-Companion',
-  'custom_components',
-  'menstrual_cycle_companion',
-  'www'
-);
 const cards = {
   gauge: 'menstrual-cycle-companion-gauge.js',
   heatmap: 'menstrual-cycle-companion-heatmap.js',
@@ -29,11 +21,6 @@ for (const [name, filename] of Object.entries(cards)) {
 
   assert.ok(source.includes(`custom:${publicName}`), `${filename} has no branded stub type`);
   assert.ok(source.includes(`'${publicName}'`) || source.includes(`"${publicName}"`), `${filename} has no branded registration`);
-  assert.strictEqual(
-    fs.readFileSync(path.join(bundleRoot, filename), 'utf8'),
-    source,
-    `${filename} is not synchronized into the integration bundle`
-  );
 }
 
 const legacy = {
@@ -50,17 +37,29 @@ const legacy = {
 };
 
 for (const [legacyFilename, canonicalFilename] of Object.entries(legacy)) {
-  for (const directory of [repoRoot, bundleRoot]) {
-    const content = fs.readFileSync(path.join(directory, legacyFilename), 'utf8');
-    assert.ok(content.includes(`import './${canonicalFilename}';`), `${legacyFilename} is not a canonical loader`);
-    assert.ok(content.length < 200, `${legacyFilename} still contains a duplicate implementation`);
-  }
+  const content = fs.readFileSync(path.join(repoRoot, legacyFilename), 'utf8');
+  assert.ok(content.includes(`import './${canonicalFilename}';`), `${legacyFilename} is not a canonical loader`);
+  assert.ok(content.length < 200, `${legacyFilename} still contains a duplicate implementation`);
 }
+
+const integrationWww = path.resolve(
+  repoRoot,
+  '..',
+  'Menstrual-Cycle-Companion',
+  'custom_components',
+  'menstrual_cycle_companion',
+  'www'
+);
+assert.deepStrictEqual(
+  fs.readdirSync(integrationWww).filter((filename) => filename.endsWith('.js')),
+  [],
+  'integration www/ must not contain bundled card JavaScript'
+);
 
 const gauge = fs.readFileSync(path.join(repoRoot, cards.gauge), 'utf8');
 for (const alias of ['menstrual-gauge-card', 'menstrual-cycle-gauge-card', 'menstruation-gauge-card']) {
   assert.ok(gauge.includes(`'${alias}'`), `missing gauge compatibility alias ${alias}`);
 }
 
-console.log('Card resource naming, synchronization, and compatibility tests passed.');
+console.log('Card resource naming, standalone loading, and no-bundle compatibility tests passed.');
 
