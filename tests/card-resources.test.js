@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..');
+const loader = fs.readFileSync(path.join(repoRoot, 'menstrual-cycle-companion.js'), 'utf8');
 const cards = {
   gauge: 'menstrual-cycle-companion-gauge.js',
   heatmap: 'menstrual-cycle-companion-heatmap.js',
@@ -50,10 +51,16 @@ const integrationWww = path.resolve(
   'menstrual_cycle_companion',
   'www'
 );
-assert.deepStrictEqual(
-  fs.readdirSync(integrationWww).filter((filename) => filename.endsWith('.js')),
-  [],
-  'integration www/ must not contain bundled card JavaScript'
+assert.ok(!fs.existsSync(integrationWww), 'integration www/ must not exist');
+
+for (const filename of ['menstrual-i18n.js', 'menstrual-icons.js', ...Object.values(cards)]) {
+  assert.ok(loader.includes(`import './${filename}';`), `collection loader does not import ${filename}`);
+}
+assert.ok(
+  fs.readFileSync(path.join(repoRoot, 'menstrual-i18n.js'), 'utf8').includes(
+    '/hacsfiles/menstrual-cycle-companion-cards/translations/'
+  ),
+  'translations must be loaded from the standalone cards repository'
 );
 
 const gauge = fs.readFileSync(path.join(repoRoot, cards.gauge), 'utf8');

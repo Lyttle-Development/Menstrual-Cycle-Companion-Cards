@@ -20,8 +20,9 @@ Optional Lovelace cards for the [Menstrual Cycle Companion](https://github.com/L
 
 The cards do not store cycle data and cannot work without a configured integration sensor.
 Each card is an independent JavaScript module; install or register only the cards used by
-your dashboard. The integration provides the shared asset and translation endpoints, but
-does not bundle or automatically register card JavaScript.
+your dashboard. The repository also provides `menstrual-cycle-companion.js`, a convenience
+loader that registers the complete collection with one resource. The integration provides
+the shared asset endpoint, but does not contain cards or translations.
 
 The gauge's colored outer ring shows the proposed menstruation, follicular,
 ovulation, and luteal phases. The calendar editor uses matching colored
@@ -33,10 +34,11 @@ underlines for each proposed phase, while confirmed bleeding days remain filled.
 2. Open **HACS → Frontend**.
 3. Search for **Menstrual Cycle Companion Cards** and install it.
 4. Restart Home Assistant if HACS requests it.
-5. Go to **Settings → Dashboards → Resources** and add the branded JavaScript modules you use:
+5. Go to **Settings → Dashboards → Resources** and add the collection loader:
 
-   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-gauge.js` as **JavaScript module**
-   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion-heatmap.js` as **JavaScript module**
+   - `/hacsfiles/menstrual-cycle-companion-cards/menstrual-cycle-companion.js` as **JavaScript module**
+
+   Alternatively, add only the individual branded card modules used by your dashboard.
 
 For an unpublished repository, add this repository to HACS as a custom **Dashboard** repository.
 
@@ -97,7 +99,7 @@ The referenced sensor should expose a `dates`, `date_list`, or `history` attribu
 
 ## Manual installation
 
-Copy the branded JavaScript files you use into `/config/www/`, add them as JavaScript-module resources, and clear the browser cache. The integration must still be installed separately. If the integration is installed through HACS, it bundles the same files under its `www/` directory and registers them automatically; do not install both copies unless you need a standalone override. The old resource filenames remain compatibility loaders.
+Copy `menstrual-cycle-companion.js` or the branded JavaScript files you use into `/config/www/`, add them as JavaScript-module resources, and clear the browser cache. The integration must still be installed separately because it supplies the sensor and asset endpoint. The old resource filenames remain compatibility loaders.
 
 ## Publishing
 

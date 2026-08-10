@@ -1,5 +1,6 @@
 {
   "name": "Menstrual Cycle Companion Cards",
+  "filename": "menstrual-cycle-companion.js",
   "homeassistant": "2024.6.0",
   "render_readme": true
 }

@@ -41,11 +41,10 @@
 
   const buildUrls = (lang, baseUrl) => {
     const urls = [];
-    // Prefer the stable, correct Home Assistant resource paths first.
-    // Cards are loaded as ES modules and do not appear in document.scripts,
-    // so script-relative baseUrl detection is unreliable as a primary source.
-    urls.push(`/menstrual_cycle_companion/translations/${lang}.json`);
-    urls.push(`/hacsfiles/menstrual-cycle-card/translations/${lang}.json`);
+    // Prefer the cards repository path. Cards are loaded as ES modules and do
+    // not reliably appear in document.scripts, so script-relative detection is
+    // only a fallback.
+    urls.push(`/hacsfiles/menstrual-cycle-companion-cards/translations/${lang}.json`);
     // Script-relative paths as fallbacks for custom or legacy setups.
     if (baseUrl) urls.push(new URL(`./translations/${lang}.json`, baseUrl).href);
     if (i18n.baseUrl) urls.push(new URL(`./translations/${lang}.json`, i18n.baseUrl).href);
