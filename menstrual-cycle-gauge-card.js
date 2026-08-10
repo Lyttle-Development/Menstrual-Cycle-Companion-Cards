@@ -773,31 +773,37 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px;
+          border-radius: 16px;
+          border: 1px solid ${palette.border};
+          background: ${palette.cardBg};
+          color: ${palette.cardColor};
+          box-shadow: ${palette.shadow};
+          padding: 10px;
           overflow: hidden;
         }
-        .wrap { display: grid; gap: 10px; }
+        .wrap { display: grid; gap: 10px; min-width: 0; }
         .head { display: grid; gap: 2px; }
-        .friendly { font-size: .78rem; font-weight: 600; color: var(--secondary-text-color); text-align: left; }
-        .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
+        .friendly { font-size: .78rem; font-weight: 600; color: ${palette.monthText}; text-align: left; }
+        .title-label { font-size: .95rem; font-weight: 700; color: ${palette.cardColor}; text-align: left; }
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
         .gauge { width: 100%; height: 100%; display: block; }
         .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
-        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-        .countdown { pointer-events: auto; border: 1px solid var(--divider-color); border-radius: 4px; padding: 8px 12px; background: var(--primary-color); cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); }
+        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; padding: 52px; box-sizing: border-box; }
+        .countdown { pointer-events: auto; border-radius: 999px; border: 1px solid ${palette.buttonBorder}; padding: 4px 10px; background: ${palette.countdownBg}; cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: ${palette.countdownColor}; }
         .countdown.overdue-soon { border-style: dashed; border-width: 2px; }
         .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .title { font-weight: 700; }
         .nav { display: inline-flex; gap: 6px; }
-        .btn { border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; }
+        .btn { border: 1px solid ${palette.buttonBorder}; border-radius: 8px; background: ${palette.buttonBg}; color: ${palette.buttonColor}; padding: 4px 8px; cursor: pointer; font: inherit; }
+        .btn:disabled { cursor: default; opacity: .55; }
         .refresh-row { display: flex; justify-content: center; }
         .refresh-btn { font-size: .82rem; }
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
-        .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; }
-        .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+        .day { min-height: 32px; border: 1px solid ${palette.dayBorder}; border-radius: 8px; background: ${palette.dayBg}; color: ${palette.dayColor}; cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; }
+        .day.active { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
         .day.phase-menstruation { box-shadow: inset 0 -4px 0 #fb7185; }
         .day.phase-follicular { box-shadow: inset 0 -4px 0 #f59e0b; }
         .day.phase-ovulation { box-shadow: inset 0 -4px 0 #60a5fa; }
@@ -805,7 +811,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .day.range-start { border-radius: 12px 4px 4px 12px; }
         .day.range-end { border-radius: 4px 12px 12px 4px; }
         .day.pending-range { background: color-mix(in srgb, var(--primary-color) 24%, var(--card-background-color)); border-color: var(--primary-color); box-shadow: inset 0 -3px 0 var(--primary-color); }
-        .day.today { outline: 2px solid var(--primary-color); }
+        .day.today { outline: 2px solid ${palette.dayToday}; }
         .day.other { opacity: .3; }
         .range-help { font-size: .78rem; color: var(--secondary-text-color); padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
