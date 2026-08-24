@@ -68,9 +68,10 @@ cycle_alignment: bottom
 ```
 
 `cycle_alignment` can be `top` (align from cycle start) or `bottom` (align from cycle end).
-The heatmap includes all supplied historical and predicted cycles by default,
-with unlimited back-and-forth scrolling through the available data. Period
-duration is learned automatically by the integration.
+The heatmap includes all supplied historical and predicted cycles by default.
+The gauge card extends the forecast on demand as you navigate forward, so its
+month navigation has no forecast horizon. Period duration is learned
+automatically by the integration.
 
 ## Symptom overlays
 

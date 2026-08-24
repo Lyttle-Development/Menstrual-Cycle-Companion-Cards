@@ -157,6 +157,16 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ? attrs.predicted_cycle_starts.map((x) => this._normalizeISO(x)).filter(Boolean).sort()
       : [];
     const cycleLengthEstimate = Number(attrs.avg_cycle_length);
+    const viewDate = this._viewDate || new Date();
+    if (predictedStarts.length && Number.isFinite(cycleLengthEstimate) && cycleLengthEstimate > 0) {
+      const forecastEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 2, 1, 12);
+      let cursor = this._parseISO(predictedStarts[predictedStarts.length - 1]);
+      while (cursor && cursor < forecastEnd) {
+        cursor = new Date(cursor);
+        cursor.setDate(cursor.getDate() + Math.round(cycleLengthEstimate));
+        predictedStarts.push(this._isoFromDate(cursor));
+      }
+    }
     const cycleStarts = Array.from(new Set([...groupedStarts, ...predictedStarts])).sort();
     const phaseRanges = [];
     cycleStarts.forEach((start, index) => {
@@ -180,7 +190,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       });
     });
 
-    const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
     const series = [];
     for (let day = 1; day <= daysInMonth; day++) {
