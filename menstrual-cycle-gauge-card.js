@@ -522,6 +522,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ['ovulation', 'Ovulation', '#60a5fa'],
       ['luteal', 'Luteal', '#1e3a8a']
     ];
+    const cycleOptions = (model.phaseRanges || []).map((cycle) => {
+      const label = `${dateLabel(cycle.start, { month: 'short', day: 'numeric', year: 'numeric' })} – ${dateLabel(cycle.end, { month: 'short', day: 'numeric', year: 'numeric' })}${cycle.predicted ? ' (expected)' : ''}`;
+      return `<option value="${cycle.start}" ${selectedCycle?.start === cycle.start ? 'selected' : ''}>${label}</option>`;
+    }).join('');
     const phaseItems = phaseDefinitions.map(([key, label, color]) => {
       const phase = selectedCycle?.[key] || (isCurrentViewMonth ? model.phases[key] : {});
       const active = phase.start && phase.end && this._dayDiff(viewIso, phase.start) >= 0
@@ -534,7 +538,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     return `
       <section class="overview" aria-label="Cycle overview">
         <div class="overview-main">
-          <div class="eyebrow">Cycle progress</div>
+          <div class="details-heading"><div class="eyebrow">Cycle progress</div>${cycleOptions ? `<label class="cycle-select-label">Cycle<select data-cycle-select aria-label="Select cycle">${cycleOptions}</select></label>` : ''}</div>
           <div class="phase-list">${phaseItems}</div>
           <div class="cycle-position">${cycleDay ? `Cycle day ${cycleDay}` : 'Add a cycle start to begin tracking'}</div>
           <div class="cycle-track" aria-hidden="true"><span class="cycle-fill" style="width:${progress}%"></span><span class="cycle-marker" style="left:${progress}%"></span></div>
@@ -761,6 +765,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         if (refreshedButton) refreshedButton.disabled = false;
       }
     });
+    this.shadowRoot.querySelector('[data-cycle-select]')?.addEventListener('change', (event) => {
+      const selectedStart = this._parseISO(event.target.value);
+      if (!selectedStart) return;
+      this._viewDate = new Date(selectedStart.getFullYear(), selectedStart.getMonth(), 1, 12);
+      this._render();
+    });
     this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
       this._render();
@@ -904,6 +914,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .countdown { pointer-events: none; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--primary-color); font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
         .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
         .overview-main { min-width: 0; }
+        .overview, .overview * { user-select: text; -webkit-user-select: text; }
+        .details-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+        .cycle-select-label { display: grid; gap: 3px; color: var(--secondary-text-color); font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; }
+        .cycle-select-label select { max-width: 190px; border: 1px solid var(--divider-color); border-radius: 8px; padding: 5px 7px; background: var(--card-background-color); color: var(--primary-text-color); font: inherit; font-size: .72rem; text-transform: none; letter-spacing: normal; cursor: pointer; }
         .eyebrow, .stat-label { color: var(--secondary-text-color); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
         .phase-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
         .phase-item { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: 999px; color: var(--secondary-text-color); font-size: .72rem; }
