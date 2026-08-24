@@ -814,6 +814,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const cardTitle = String(this._config.title || '').trim();
     const friendlyName = String(this._config.friendly_name || model.stateObj?.attributes?.friendly_name || '').trim();
     const canEdit = this._config?.calendar_edit_enabled !== false;
+    const daysUntil = Number(model.stateObj?.attributes?.days_until_next_start);
+    const countdown = Number.isFinite(daysUntil) ? `${daysUntil} days` : '-- days';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -832,6 +834,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .head { display: grid; gap: 3px; padding: 1px 2px 0; }
         .friendly { font-size: .78rem; font-weight: 500; color: var(--secondary-text-color); text-align: left; }
         .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
+        .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: -4px auto 0; }
+        .gauge { width: 100%; height: 100%; display: block; }
+        .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
+        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .countdown { pointer-events: none; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--primary-color); font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
         .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
         .overview-main { min-width: 0; }
         .eyebrow, .stat-label { color: var(--secondary-text-color); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
@@ -863,7 +870,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .btn:active { transform: scale(.97); }
         .refresh-row { display: flex; justify-content: center; }
         .refresh-btn { font-size: .82rem; }
-        .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 10px; padding-top: 4px; }
+        .editor { display: grid; gap: 10px; padding-top: 4px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
         .day { min-height: 34px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
@@ -895,6 +902,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
             ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
           </div>` : ''}
+          <div class="gauge-wrap">
+          ${this._renderGauge(model, palette)}
+          <div class="center"><span class="countdown">${countdown}</span></div>
+          </div>
           ${this._renderCycleOverview(model)}
           <div class="toolbar">
             <div class="title">Calendar</div>
@@ -904,7 +915,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
             </div>
           </div>
-          ${this._config.show_editor && canEdit ? `
+          ${this._config.show_editor !== false ? `
           <div class="editor">
             <div class="toolbar">
               <div class="title">${monthYear}</div>
