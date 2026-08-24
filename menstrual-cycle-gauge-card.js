@@ -11,8 +11,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       title: 'Cycle Gauge',
       show_fertile_period: true,
       calendar_edit_enabled: true,
-      calendar_selection_mode: 'range',
-      period_duration_days: 5
+      calendar_selection_mode: 'range'
     };
   }
 
@@ -29,7 +28,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       show_fertile_period: true,
       calendar_edit_enabled: true,
       calendar_selection_mode: 'range',
-      period_duration_days: 5,
       ...config
     };
     this._viewDate = new Date();
@@ -122,19 +120,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const sensorEffective = Number(attrs?.period_duration_days);
     const sensorLearned = Number(attrs?.period_duration_learned_avg_days);
     const sensorDefault = Number(attrs?.period_duration_default_days);
-    const cfgRaw = this._config?.period_duration_days;
-    const cfgText = String(cfgRaw ?? '').trim().toLowerCase();
-
-    if (cfgText === 'learnt' || cfgText === 'learned') {
-      if (Number.isFinite(sensorLearned)) return Math.max(1, Math.min(14, Math.round(sensorLearned)));
-      if (Number.isFinite(sensorEffective)) return Math.max(1, Math.min(14, Math.round(sensorEffective)));
-      if (Number.isFinite(sensorDefault)) return Math.max(1, Math.min(14, Math.round(sensorDefault)));
-      return 5;
-    }
-
-    const cfgNum = Number(cfgRaw);
-    if (Number.isFinite(cfgNum)) return Math.max(1, Math.min(14, Math.round(cfgNum)));
     if (Number.isFinite(sensorEffective)) return Math.max(1, Math.min(14, Math.round(sensorEffective)));
+    if (Number.isFinite(sensorLearned)) return Math.max(1, Math.min(14, Math.round(sensorLearned)));
     if (Number.isFinite(sensorDefault)) return Math.max(1, Math.min(14, Math.round(sensorDefault)));
     return 5;
   }
@@ -155,6 +142,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ovulation: { start: this._normalizeISO(attrs.ovulation_date), end: this._normalizeISO(attrs.ovulation_date) },
       luteal: { start: this._normalizeISO(attrs.luteal_phase_start), end: this._normalizeISO(attrs.luteal_phase_end) }
     };
+    const groupedStarts = Array.isArray(attrs.grouped_starts)
+      ? attrs.grouped_starts.map((x) => this._normalizeISO(x)).filter(Boolean).sort()
+      : [];
+    const predictedStarts = Array.isArray(attrs.predicted_cycle_starts)
+      ? attrs.predicted_cycle_starts.map((x) => this._normalizeISO(x)).filter(Boolean).sort()
+      : [];
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -183,6 +176,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       fertileStart,
       fertileEnd,
       phases,
+      groupedStarts,
+      predictedStarts,
+      averageCycleLength: Number(attrs.avg_cycle_length),
+      variability: Number(attrs.cycle_length_variability_days),
+      predictionConfidence: Number(attrs.prediction_confidence),
+      predictionMethod: String(attrs.prediction_method || ''),
       daysInMonth,
       series,
       todayIso: this._isoFromDate(new Date())
@@ -430,7 +429,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       }).join('');
     }
 
-    const handA = this._polar(cx, cy, rInner - 2, handAngle);
+      const handA = this._polar(cx, cy, rInner - 2, handAngle);
     const handB = this._polar(cx, cy, rInner + extraBar - 2, handAngle);
     const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(this._viewDate);
 
@@ -448,6 +447,59 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         ${isCurrentViewMonth ? `<line x1="${handA.x.toFixed(1)}" y1="${handA.y.toFixed(1)}" x2="${handB.x.toFixed(1)}" y2="${handB.y.toFixed(1)}" stroke="${palette.hand}" stroke-width="1.9" stroke-linecap="round"></line>` : ''}
         <circle cx="${cx}" cy="${cy}" r="106" fill="none" stroke="${palette.ring}" stroke-width="1"></circle>
       </svg>
+    `;
+  }
+
+  _renderCycleOverview(model) {
+    const starts = model.groupedStarts || [];
+    const lastStart = starts[starts.length - 1] || '';
+    const lastStartDate = this._parseISO(lastStart);
+    const today = this._parseISO(model.todayIso);
+    const cycleDay = lastStartDate && today ? Math.max(1, this._dayDiff(model.todayIso, lastStart) + 1) : null;
+    const average = Number.isFinite(model.averageCycleLength) ? Math.round(model.averageCycleLength) : null;
+    const variability = Number.isFinite(model.variability) ? Math.round(model.variability) : null;
+    const confidence = Number.isFinite(model.predictionConfidence) ? Math.round(model.predictionConfidence * 100) : null;
+    const next = model.predicted || (model.predictedStarts || [])[0] || '';
+    const previous = starts.length > 1 ? starts[starts.length - 2] : '';
+    const dateLabel = (iso, options = { month: 'short', day: 'numeric' }) => {
+      const date = this._parseISO(iso);
+      return date ? new Intl.DateTimeFormat('en-US', options).format(date) : '--';
+    };
+    const phaseDefinitions = [
+      ['menstruation', 'Period', '#fb7185'],
+      ['follicular', 'Follicular', '#f59e0b'],
+      ['ovulation', 'Ovulation', '#60a5fa'],
+      ['luteal', 'Luteal', '#1e3a8a']
+    ];
+    const phaseItems = phaseDefinitions.map(([key, label, color]) => {
+      const phase = model.phases[key] || {};
+      const active = phase.start && phase.end && this._dayDiff(model.todayIso, phase.start) >= 0
+        && this._dayDiff(phase.end, model.todayIso) >= 0;
+      return `<div class="phase-item ${active ? 'is-current' : ''}"><span class="phase-dot" style="background:${color}"></span><span>${label}</span>${active ? '<strong>Now</strong>' : ''}</div>`;
+    }).join('');
+    const progress = average && cycleDay ? Math.min(100, Math.max(4, (cycleDay / average) * 100)) : 8;
+
+    return `
+      <section class="overview" aria-label="Cycle overview">
+        <div class="overview-main">
+          <div class="eyebrow">Cycle progress</div>
+          <div class="phase-list">${phaseItems}</div>
+          <div class="cycle-position">${cycleDay ? `Cycle day ${cycleDay}` : 'Add a cycle start to begin tracking'}</div>
+          <div class="cycle-track" aria-hidden="true"><span class="cycle-fill" style="width:${progress}%"></span><span class="cycle-marker" style="left:${progress}%"></span></div>
+          <div class="track-labels"><span>Start</span><span>${average ? `Typical cycle · ${average} days` : 'Typical cycle'}</span><span>Next</span></div>
+        </div>
+        <div class="overview-stats">
+          <div class="stat"><span class="stat-label">Next guess</span><strong>${dateLabel(next)}</strong><small>${next ? 'predicted start' : 'not enough data'}</small></div>
+          <div class="stat"><span class="stat-label">Last start</span><strong>${dateLabel(lastStart)}</strong><small>${previous ? `previous · ${dateLabel(previous)}` : 'recorded history'}</small></div>
+        </div>
+      </section>
+      <section class="stats-row" aria-label="Cycle statistics">
+        <div class="stat-pill"><strong>${average || '--'}</strong><span>avg days</span></div>
+        <div class="stat-pill"><strong>${variability !== null ? `±${variability}` : '--'}</strong><span>variation</span></div>
+        <div class="stat-pill"><strong>${confidence !== null ? `${confidence}%` : '--'}</strong><span>confidence</span></div>
+        <div class="stat-pill"><strong>${starts.length || '--'}</strong><span>recorded cycles</span></div>
+      </section>
+      <div class="prediction-strip"><span class="prediction-dot"></span><span><strong>Forecast</strong> ${model.predictedStarts?.length ? `${model.predictedStarts.length} upcoming guesses` : 'will appear as more history is recorded'}${model.predictionMethod ? ` · ${model.predictionMethod}` : ''}</span></div>
     `;
   }
 
@@ -472,6 +524,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       }
       const iso = this._isoFromDate(new Date(y, m, day, 12, 0, 0, 0));
       const active = model.confirmedSet.has(iso);
+      const predicted = (model.predictedStarts || []).includes(iso) || iso === model.predicted;
       const today = iso === model.todayIso;
       const previousIso = this._isoFromDate(new Date(y, m, day - 1, 12, 0, 0, 0));
       const nextIso = this._isoFromDate(new Date(y, m, day + 1, 12, 0, 0, 0));
@@ -484,7 +537,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       const phase = model.series.find((step) => step.iso === iso)?.phase || '';
       const rangeStart = active && !model.confirmedSet.has(previousIso);
       const rangeEnd = active && !model.confirmedSet.has(nextIso);
-      items.push(`<button class="day ${active ? 'active' : ''} ${phase ? `phase-${phase}` : ''} ${rangeStart ? 'range-start' : ''} ${rangeEnd ? 'range-end' : ''} ${inPendingRange ? 'pending-range' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
+      items.push(`<button class="day ${active ? 'active' : ''} ${predicted ? 'predicted' : ''} ${phase ? `phase-${phase}` : ''} ${rangeStart ? 'range-start' : ''} ${rangeEnd ? 'range-end' : ''} ${inPendingRange ? 'pending-range' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}${predicted ? '<span class="forecast-mark" aria-label="Predicted start">•</span>' : ''}</button>`);
     }
     return items.join('');
   }
@@ -657,6 +710,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() + 1, 1);
       this._render();
     });
+    this.shadowRoot.querySelector('[data-nav="today"]')?.addEventListener('click', () => {
+      const now = new Date();
+      this._viewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      this._render();
+    });
     if (this._config?.calendar_edit_enabled !== false) {
       this.shadowRoot.querySelector('[data-action="toggle-editor"]')?.addEventListener('click', () => {
         this._editorOpen = !this._editorOpen;
@@ -751,24 +809,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
 
     const model = this._buildModel();
     const palette = this._palette(model.state);
-    this._lastCardWidth = this.getBoundingClientRect()?.width || 0;
     const locale = 'en-US';
     const monthYear = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(this._viewDate);
     const cardTitle = String(this._config.title || '').trim();
     const friendlyName = String(this._config.friendly_name || model.stateObj?.attributes?.friendly_name || '').trim();
     const canEdit = this._config?.calendar_edit_enabled !== false;
-    const daysUntil = Number(model.stateObj?.attributes?.days_until_next_start);
-    const isOverdueSoon = Number.isFinite(daysUntil) && daysUntil <= -3;
-    const countdown = Number.isFinite(daysUntil)
-      ? `${daysUntil} ${this._t('days_unit')}`
-      : this._t('days_unknown');
-    const samples = Array.isArray(model.stateObj?.attributes?.cycle_length_samples)
-      ? model.stateObj.attributes.cycle_length_samples.length
-      : 0;
-    const variability = Number(model.stateObj?.attributes?.cycle_length_variability_days);
-    const predictionNote = samples
-      ? `Personalized from ${samples} previous cycle${samples === 1 ? '' : 's'}${Number.isFinite(variability) && variability > 0 ? ` • typical variation ±${variability} days` : ''}`
-      : 'Using a default estimate until more cycle history is recorded';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -783,17 +828,33 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           color: var(--primary-text-color);
           box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, .08));
         }
-        .wrap { display: grid; gap: 12px; }
+        .wrap { display: grid; gap: 16px; }
         .head { display: grid; gap: 3px; padding: 1px 2px 0; }
         .friendly { font-size: .78rem; font-weight: 500; color: var(--secondary-text-color); text-align: left; }
         .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
-        .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
-        .gauge { width: 100%; height: 100%; display: block; }
-        .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
-        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-        .countdown { pointer-events: auto; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--primary-color); cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
-        .countdown.overdue-soon { border-style: dashed; border-width: 2px; }
-        .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
+        .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
+        .overview-main { min-width: 0; }
+        .eyebrow, .stat-label { color: var(--secondary-text-color); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
+        .phase-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
+        .phase-item { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: 999px; color: var(--secondary-text-color); font-size: .72rem; }
+        .phase-item.is-current { border-color: color-mix(in srgb, var(--primary-color) 35%, transparent); background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-text-color); }
+        .phase-item strong { margin-left: 2px; color: var(--primary-color); font-size: .62rem; text-transform: uppercase; }
+        .cycle-position { margin-top: 4px; color: var(--secondary-text-color); font-size: .82rem; }
+        .cycle-track { position: relative; height: 10px; margin: 24px 7px 7px; border-radius: 999px; background: color-mix(in srgb, var(--primary-text-color) 12%, transparent); }
+        .cycle-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #fb7185, #f59e0b, #60a5fa); }
+        .cycle-marker { position: absolute; top: 50%; width: 16px; height: 16px; border: 3px solid var(--ha-card-background, var(--card-background-color)); border-radius: 50%; background: var(--primary-color); transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+        .track-labels { display: flex; justify-content: space-between; color: var(--secondary-text-color); font-size: .66rem; }
+        .track-labels span:nth-child(2) { text-align: center; }
+        .overview-stats { display: grid; gap: 8px; align-content: center; }
+        .stat { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); }
+        .stat strong { font-size: 1rem; }
+        .stat small { color: var(--secondary-text-color); font-size: .68rem; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .stat-pill { display: grid; gap: 2px; padding: 10px 8px; border: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent); border-radius: 10px; text-align: center; }
+        .stat-pill strong { font-size: 1.05rem; }
+        .stat-pill span { color: var(--secondary-text-color); font-size: .66rem; }
+        .prediction-strip { display: flex; align-items: center; gap: 8px; color: var(--secondary-text-color); font-size: .72rem; }
+        .prediction-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 0 4px color-mix(in srgb, #60a5fa 16%, transparent); }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 2px; }
         .title { font-weight: 700; color: var(--primary-text-color); }
         .nav { display: inline-flex; gap: 6px; }
@@ -802,13 +863,16 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .btn:active { transform: scale(.97); }
         .refresh-row { display: flex; justify-content: center; }
         .refresh-btn { font-size: .82rem; }
-        .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
+        .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 10px; padding-top: 4px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
         .day { min-height: 34px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
         .day:hover { border-color: color-mix(in srgb, var(--primary-color) 55%, transparent); background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
         .day:active { transform: scale(.96); }
-        .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+        .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); box-shadow: 0 2px 5px color-mix(in srgb, var(--primary-color) 28%, transparent); }
+        .day.predicted { border: 1px dashed #60a5fa; }
+        .day.active.predicted { border-color: #bfdbfe; }
+        .forecast-mark { display: block; height: 0; color: #60a5fa; font-size: 1.1rem; line-height: 0; transform: translateY(-2px); }
         .day.phase-menstruation { box-shadow: inset 0 -4px 0 #fb7185; }
         .day.phase-follicular { box-shadow: inset 0 -4px 0 #f59e0b; }
         .day.phase-ovulation { box-shadow: inset 0 -4px 0 #60a5fa; }
@@ -822,7 +886,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
-        .prediction-note { font-size: .7rem; text-align: center; color: var(--secondary-text-color); opacity: .82; }
+        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
       </style>
       <ha-card>
         <div class="wrap">
@@ -831,26 +895,19 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
             ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
           </div>` : ''}
-          <div class="gauge-wrap">
-            ${this._renderGauge(model, palette)}
-            <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
+          ${this._renderCycleOverview(model)}
+          <div class="toolbar">
+            <div class="title">Calendar</div>
+            <div class="nav">
+              <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
+              <button type="button" class="btn" data-nav="today">Today</button>
+              <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
+            </div>
           </div>
-          <div class="phase-legend">
-            <span class="phase-key"><span class="phase-dot" style="background:#fb7185"></span>Menstruation</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#f59e0b"></span>Follicular</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
-            <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
-          </div>
-          <div class="prediction-note">${predictionNote}</div>
-          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh</button></div>
           ${this._config.show_editor && canEdit ? `
           <div class="editor">
             <div class="toolbar">
               <div class="title">${monthYear}</div>
-              <div class="nav">
-                <button type="button" class="btn" data-nav="prev">◀</button>
-                <button type="button" class="btn" data-nav="next">▶</button>
-              </div>
             </div>
             ${String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range'
               ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'} Right-click a saved range (or hold it on mobile) to delete it.</div>`
@@ -863,6 +920,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
             </div>
           </div>` : ''}
+          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh forecast</button></div>
         </div>
       </ha-card>
     `;
@@ -881,7 +939,6 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
       show_fertile_period: true,
       calendar_edit_enabled: true,
       calendar_selection_mode: 'range',
-      period_duration_days: 5,
       ...config
     };
     this._render();
@@ -1022,10 +1079,6 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
           <input id="title" value="${this._config.title || ''}" placeholder="Cycle Gauge">
         </div>
         <div class="row">
-          <label>${this._t('period_duration')}</label>
-          <input id="period_duration_days" type="text" value="${String(this._config.period_duration_days ?? '')}" placeholder='${this._t('period_placeholder')}'>
-        </div>
-        <div class="row">
           <label>${this._t('theme')}</label>
           <select id="theme_mode">
             <option value="auto" ${this._config.theme_mode === 'auto' ? 'selected' : ''}>${this._t('theme_auto')}</option>
@@ -1099,24 +1152,6 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
       const fromSensor = this._sensorLabelFromEntity(selected);
       const next = { ...this._config, friendly_name: fromSensor || '' };
       this._emit(next);
-    });
-    this.shadowRoot.getElementById('period_duration_days')?.addEventListener('change', (ev) => {
-      const raw = String(ev.target.value || '').trim();
-      if (!raw) {
-        const next = { ...this._config };
-        delete next.period_duration_days;
-        this._emit(next);
-        return;
-      }
-      const lowered = raw.toLowerCase();
-      if (lowered === 'learnt' || lowered === 'learned') {
-        this._handleInput('period_duration_days', 'learnt');
-        return;
-      }
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) return;
-      const clamped = Math.max(1, Math.min(14, Math.round(parsed)));
-      this._handleInput('period_duration_days', clamped);
     });
     this.shadowRoot.getElementById('title')?.addEventListener('change', (ev) => this._handleInput('title', ev.target.value));
     this.shadowRoot.getElementById('theme_mode')?.addEventListener('change', (ev) => this._handleInput('theme_mode', ev.target.value));

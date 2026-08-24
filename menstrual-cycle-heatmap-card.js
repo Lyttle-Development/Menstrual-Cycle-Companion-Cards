@@ -5,8 +5,6 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       entity: 'sensor.menstruation',
       entry_id: '',
       title: 'Cycle Heatmap',
-      max_cycles: 30,
-      period_duration_days: 5,
       show_fertile_period: true,
       symptom_entities: [],
       cycle_alignment: 'top',
@@ -18,8 +16,6 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       throw new Error('entity or entry_id is required');
     }
     this._config = {
-      max_cycles: 30,
-      period_duration_days: 5,
       title: 'Cycle Heatmap',
       show_fertile_period: true,
       symptom_entities: [],
@@ -309,12 +305,11 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
       : [attrs.next_predicted_start || null];
     const cycles = this._buildCycles(groupedStarts, predictedCycleStarts);
 
-    const maxCycles = Math.max(1, Number(this._config.max_cycles || 18));
-    const visibleCycles = cycles.slice(-maxCycles);
+    const visibleCycles = cycles;
     const maxCycleLength = Math.max(1, ...visibleCycles.map((cycle) => cycle.length));
 
     const sensorPeriodDays = Number(attrs.period_duration_days || 5);
-    const periodDays = Math.max(1, Math.min(14, Number(this._config.period_duration_days || sensorPeriodDays || 5)));
+    const periodDays = Math.max(1, Math.min(14, sensorPeriodDays || 5));
     const showFertile = this._config.show_fertile_period !== false;
     const symptomSources = this._resolveSymptomSources();
     const symptomsByDate = new Map();

@@ -39,7 +39,6 @@ type: custom:menstrual-cycle-gauge-card
 entity: sensor.anna
 friendly_name: Anna
 title: Cycle gauge
-period_duration_days: learnt
 show_fertile_period: true
 calendar_edit_enabled: true
 calendar_selection_mode: range
@@ -50,7 +49,9 @@ Click **Show editor** or the countdown area to open the month calendar. In the
 default `range` mode, click the first day and then the last day of the cycle.
 The interval is highlighted while it is being selected and the completed range
 is shown with rounded start/end caps. Set `calendar_selection_mode: toggle` to
-use the original single-day add/remove behavior.
+use the original single-day add/remove behavior. The calendar can be navigated
+backward or forward without a date limit; use **Today** to return to the
+current month.
 
 ## Heatmap example
 
@@ -58,15 +59,14 @@ use the original single-day add/remove behavior.
 type: custom:menstrual-cycle-heatmap-card
 entity: sensor.anna
 title: Cycle history
-max_cycles: 30
-period_duration_days: 5
 show_fertile_period: true
 cycle_alignment: bottom
 ```
 
 `cycle_alignment` can be `top` (align from cycle start) or `bottom` (align from cycle end).
-The heatmap includes the integration's 12 predicted future cycles by default;
-set `max_cycles` to control how many historical and predicted columns are visible.
+The heatmap includes all supplied historical and predicted cycles by default,
+with unlimited back-and-forth scrolling through the available data. Period
+duration is learned automatically by the integration.
 
 ## Symptom overlays
 
@@ -94,4 +94,3 @@ To publish a HACS-detectable release, update `version.json` (`major`, `minor`, o
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
-
