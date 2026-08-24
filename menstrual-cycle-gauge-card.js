@@ -107,6 +107,13 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     return `${y}-${m}-${d}`;
   }
 
+  _addDaysISO(iso, days) {
+    const date = this._parseISO(iso);
+    if (!date) return null;
+    date.setDate(date.getDate() + Number(days || 0));
+    return this._isoFromDate(date);
+  }
+
   _dayDiff(aIso, bIso) {
     const a = this._parseISO(aIso);
     const b = this._parseISO(bIso);
@@ -150,6 +157,29 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const predictedStarts = Array.isArray(attrs.predicted_cycle_starts)
       ? attrs.predicted_cycle_starts.map((x) => this._normalizeISO(x)).filter(Boolean).sort()
       : [];
+    const cycleLengthEstimate = Number(attrs.avg_cycle_length);
+    const cycleStarts = Array.from(new Set([...groupedStarts, ...predictedStarts])).sort();
+    const phaseRanges = [];
+    cycleStarts.forEach((start, index) => {
+      const nextStart = cycleStarts[index + 1]
+        || (predictedStarts.includes(start) && Number.isFinite(cycleLengthEstimate)
+          ? this._addDaysISO(start, Math.round(cycleLengthEstimate))
+          : null);
+      if (!nextStart) return;
+      const cycleEnd = this._addDaysISO(nextStart, -1);
+      const periodEnd = this._addDaysISO(start, Math.min(periodDuration - 1, this._dayDiff(cycleEnd, start)));
+      const ovulation = this._addDaysISO(nextStart, -14);
+      const ovulationDate = this._dayDiff(ovulation, periodEnd) < 0 ? periodEnd : (this._dayDiff(ovulation, cycleEnd) > 0 ? cycleEnd : ovulation);
+      phaseRanges.push({
+        start,
+        end: cycleEnd,
+        predicted: predictedStarts.includes(start),
+        menstruation: { start, end: periodEnd },
+        follicular: { start: this._addDaysISO(periodEnd, 1), end: this._addDaysISO(ovulationDate, -1) },
+        ovulation: { start: ovulationDate, end: ovulationDate },
+        luteal: { start: this._addDaysISO(ovulationDate, 1), end: cycleEnd }
+      });
+    });
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -162,8 +192,9 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         iso,
         confirmed: confirmedSet.has(iso),
         fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false,
-        phase: Object.keys(phases).find((key) => phases[key].start && phases[key].end
-          && this._dayDiff(iso, phases[key].start) >= 0 && this._dayDiff(phases[key].end, iso) >= 0) || ''
+        phase: phaseRanges.flatMap((cycle) => Object.entries(cycle).filter(([key]) => ['menstruation', 'follicular', 'ovulation', 'luteal'].includes(key))
+          .map(([key, range]) => ({ key, range }))).find(({ range }) => range.start && range.end
+            && this._dayDiff(iso, range.start) >= 0 && this._dayDiff(range.end, iso) >= 0)?.key || ''
       });
     }
 
@@ -178,6 +209,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       fertileStart,
       fertileEnd,
       phases,
+      phaseRanges,
       groupedStarts,
       predictedStarts,
       averageCycleLength: Number(attrs.avg_cycle_length),
@@ -384,21 +416,25 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ovulation: '#60a5fa',
       luteal: '#1e3a8a'
     };
-    const phaseBars = Object.entries(model.phases || {}).map(([name, phase]) => {
-      if (!phase.start || !phase.end) return '';
-      const startDt = this._parseISO(phase.start);
-      const endDt = this._parseISO(phase.end);
-      if (!startDt || !endDt) return '';
-      const visibleStart = new Date(Math.max(startDt.getTime(), new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), 1, 12).getTime()));
-      const visibleEnd = new Date(Math.min(endDt.getTime(), new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), total, 12).getTime()));
-      if (visibleStart > visibleEnd) return '';
-      const startDay = visibleStart.getDate();
-      const endDay = visibleEnd.getDate();
-      const startAngle = -90 + ((((startDay - 1) + 0.06) / total) * 360);
-      const endAngle = -90 + ((((endDay) - 0.06) / total) * 360);
-      const dPath = this._arcPath(cx, cy, rInner + extraBar + 13, startAngle, endAngle);
-      return `<path d="${dPath}" fill="none" stroke="${phaseColors[name]}" stroke-width="7" stroke-linecap="butt" stroke-opacity=".82"></path>`;
-    }).join('');
+    const monthStart = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), 1, 12);
+    const monthEnd = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth(), total, 12);
+    const phaseBars = (model.phaseRanges || []).flatMap((cycle) => Object.entries(cycle)
+      .filter(([name]) => phaseColors[name])
+      .map(([name, phase]) => {
+        const startDt = this._parseISO(phase.start);
+        const endDt = this._parseISO(phase.end);
+        if (!startDt || !endDt) return '';
+        const visibleStart = new Date(Math.max(startDt.getTime(), monthStart.getTime()));
+        const visibleEnd = new Date(Math.min(endDt.getTime(), monthEnd.getTime()));
+        if (visibleStart > visibleEnd) return '';
+        const startDay = visibleStart.getDate();
+        const endDay = visibleEnd.getDate();
+        const startAngle = -90 + ((((startDay - 1) + 0.06) / total) * 360);
+        const endAngle = -90 + ((((endDay) - 0.06) / total) * 360);
+        const dPath = this._arcPath(cx, cy, rInner + extraBar + 13, startAngle, endAngle);
+        const opacity = cycle.predicted ? '.42' : '.82';
+        return `<path d="${dPath}" fill="none" stroke="${phaseColors[name]}" stroke-width="7" stroke-linecap="butt" stroke-opacity="${opacity}"></path>`;
+      })).join('');
 
     let predictedMarker = '';
     let predictedBars = '';
