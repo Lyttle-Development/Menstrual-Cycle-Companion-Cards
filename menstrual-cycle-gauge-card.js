@@ -1108,6 +1108,68 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
   _render() {
     if (!this._config) return;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    if (!customElements.get('ha-form')) {
+      this._renderLegacy();
+      return;
+    }
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = { ...this._config };
+    form.schema = [
+      { name: 'entity', required: true, selector: { entity: { domain: 'sensor' } } },
+      { name: 'friendly_name', selector: { text: {} } },
+      { name: 'title', selector: { text: {} } },
+      {
+        name: 'view_mode',
+        selector: {
+          select: {
+            options: [
+              { value: 'gauge', label: 'Gauge' },
+              { value: 'calendar', label: 'Calendar' },
+              { value: 'details', label: 'Details' }
+            ],
+            mode: 'dropdown'
+          }
+        }
+      },
+      {
+        name: 'theme_mode',
+        selector: {
+          select: {
+            options: [
+              { value: 'auto', label: 'Automatic' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' }
+            ],
+            mode: 'dropdown'
+          }
+        }
+      },
+      { name: 'show_fertile_period', selector: { boolean: {} } },
+      { name: 'calendar_edit_enabled', selector: { boolean: {} } },
+      {
+        name: 'calendar_selection_mode',
+        selector: {
+          select: {
+            options: [
+              { value: 'range', label: 'Start and end date (range)' },
+              { value: 'toggle', label: 'Single-day add/remove' }
+            ],
+            mode: 'dropdown'
+          }
+        }
+      }
+    ];
+    form.addEventListener('value-changed', (event) => {
+      this._emit({ ...this._config, ...event.detail.value });
+    });
+    this.shadowRoot.replaceChildren(form);
+  }
+
+  _renderLegacy() {
+    if (!this._config) return;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     const entities = this._entityOptions();
     const selectedEntity = String(this._config.entity || '');
     const hasHaSelector = Boolean(customElements.get('ha-selector'));
