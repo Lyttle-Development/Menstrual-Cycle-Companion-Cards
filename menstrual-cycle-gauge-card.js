@@ -509,10 +509,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const cycleAnchor = selectedCycle?.start || (isCurrentViewMonth ? lastStart : '');
     const cycleDay = cycleAnchor ? Math.max(1, this._dayDiff(viewIso, cycleAnchor) + 1) : null;
     const average = Number.isFinite(model.averageCycleLength) ? Math.round(model.averageCycleLength) : null;
-    const variability = Number.isFinite(model.variability) ? Math.round(model.variability) : null;
-    const confidence = Number.isFinite(model.predictionConfidence) ? Math.round(model.predictionConfidence * 100) : null;
-    const next = model.predicted || (model.predictedStarts || [])[0] || '';
-    const previous = starts.length > 1 ? starts[starts.length - 2] : '';
     const dateLabel = (iso, options = { month: 'short', day: 'numeric' }) => {
       const date = this._parseISO(iso);
       return date ? new Intl.DateTimeFormat('en-US', options).format(date) : '--';
@@ -532,10 +528,31 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const phaseDuration = selectedPhase.start && selectedPhase.end
       ? this._dayDiff(selectedPhase.end, selectedPhase.start) + 1
       : null;
+    const phaseOccurrences = (model.phaseRanges || [])
+      .filter((cycle) => cycle[selectedDefinition[0]]?.start)
+      .sort((a, b) => a[selectedDefinition[0]].start.localeCompare(b[selectedDefinition[0]].start));
+    const occurrenceStart = selectedPhase.start || '';
+    const nextOccurrenceCycle = phaseOccurrences.find((cycle) => cycle[selectedDefinition[0]].start > occurrenceStart);
+    const nextOccurrence = nextOccurrenceCycle?.[selectedDefinition[0]];
+    const previousOccurrence = [...phaseOccurrences].reverse()
+      .find((cycle) => cycle[selectedDefinition[0]].start < occurrenceStart)?.[selectedDefinition[0]];
+    const cycleLength = selectedCycle?.start && selectedCycle?.end
+      ? this._dayDiff(selectedCycle.end, selectedCycle.start) + 1
+      : average;
+    const cycleDayStarted = selectedCycle?.start && selectedPhase.start
+      ? this._dayDiff(selectedPhase.start, selectedCycle.start) + 1
+      : null;
     const phaseIsCurrent = selectedPhase.start && selectedPhase.end
       && this._dayDiff(viewIso, selectedPhase.start) >= 0
       && this._dayDiff(selectedPhase.end, viewIso) >= 0;
     const phaseIsPredicted = Boolean(selectedCycle?.predicted);
+    const phaseStatus = phaseIsPredicted
+      ? 'Expected'
+      : selectedDefinition[0] === 'menstruation' && selectedCycle
+        ? 'Recorded'
+        : selectedPhase.start
+          ? 'Calculated'
+          : '--';
     const phaseItems = phaseDefinitions.map(([key, label, color]) => {
       const isSelected = key === selectedDefinition[0];
       return `<button type="button" class="phase-tab ${isSelected ? 'active' : ''}" data-details-phase="${key}" aria-pressed="${isSelected}"><span class="phase-dot" style="background:${color}"></span>${label}</button>`;
@@ -551,23 +568,16 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           </div>
           <div class="phase-stat-grid">
             <div class="stat"><span class="stat-label">Duration</span><strong>${phaseDuration ? `${phaseDuration} days` : '--'}</strong></div>
-            <div class="stat"><span class="stat-label">Cycle day</span><strong>${cycleDay || '--'}</strong></div>
-            <div class="stat"><span class="stat-label">Cycle length</span><strong>${average ? `${average} days` : '--'}</strong></div>
-            <div class="stat"><span class="stat-label">Cycle type</span><strong>${phaseIsPredicted ? 'Forecast' : selectedCycle ? 'Recorded' : '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Starts on cycle day</span><strong>${cycleDayStarted || '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Cycle length</span><strong>${cycleLength ? `${cycleLength} days` : '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Status</span><strong>${phaseStatus}</strong></div>
           </div>
         </div>
         <div class="overview-stats">
-          <div class="stat"><span class="stat-label">Next guess</span><strong>${dateLabel(next)}</strong><small>${next ? 'predicted start' : 'not enough data'}</small></div>
-          <div class="stat"><span class="stat-label">Last start</span><strong>${dateLabel(lastStart)}</strong><small>${previous ? `previous · ${dateLabel(previous)}` : 'recorded history'}</small></div>
+          <div class="stat"><span class="stat-label">Next ${selectedDefinition[1]}</span><strong>${dateLabel(nextOccurrence?.start)}</strong><small>${nextOccurrence ? (nextOccurrenceCycle.predicted ? 'next forecast' : 'next occurrence') : 'no later forecast'}</small></div>
+          <div class="stat"><span class="stat-label">Last ${selectedDefinition[1]}</span><strong>${dateLabel(previousOccurrence?.start)}</strong><small>${previousOccurrence ? 'previous occurrence' : 'no earlier occurrence'}</small></div>
         </div>
       </section>
-      <section class="stats-row" aria-label="Cycle statistics">
-        <div class="stat-pill"><strong>${average || '--'}</strong><span>avg days</span></div>
-        <div class="stat-pill"><strong>${variability !== null ? `±${variability}` : '--'}</strong><span>variation</span></div>
-        <div class="stat-pill"><strong>${confidence !== null ? `${confidence}%` : '--'}</strong><span>confidence</span></div>
-        <div class="stat-pill"><strong>${starts.length || '--'}</strong><span>recorded cycles</span></div>
-      </section>
-      <div class="prediction-strip"><span class="prediction-dot"></span><span><strong>Forecast</strong> ${model.predictedStarts?.length ? `${model.predictedStarts.length} upcoming guesses` : 'will appear as more history is recorded'}${model.predictionMethod ? ` · ${model.predictionMethod}` : ''}</span></div>
     `;
   }
 
