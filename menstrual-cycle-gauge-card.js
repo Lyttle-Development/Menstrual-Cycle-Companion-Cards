@@ -1051,6 +1051,17 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
     const form = document.createElement('ha-form');
     form.hass = this._hass;
     form.data = { ...this._config };
+    const labels = {
+      entity: 'Entity',
+      friendly_name: 'Friendly name',
+      title: 'Title',
+      view_mode: 'View',
+      theme_mode: 'Theme',
+      show_fertile_period: 'Show fertile period',
+      calendar_edit_enabled: 'Allow calendar editing',
+      calendar_selection_mode: 'Calendar selection'
+    };
+    form.computeLabel = (schema) => labels[schema.name] || schema.name;
     form.schema = [
       { name: 'entity', required: true, selector: { entity: { domain: 'sensor' } } },
       { name: 'friendly_name', selector: { text: {} } },
