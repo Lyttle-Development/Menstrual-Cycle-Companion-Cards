@@ -1,5 +1,3 @@
-import './menstrual-cycle-heatmap-card.js';
-
 class MenstrualCycleGaugeCard extends HTMLElement {
   static getStubConfig() {
     return {
@@ -492,9 +490,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
   _renderCycleOverview(model) {
     const starts = model.groupedStarts || [];
     const lastStart = starts[starts.length - 1] || '';
-    const lastStartDate = this._parseISO(lastStart);
-    const today = this._parseISO(model.todayIso);
-    const cycleDay = lastStartDate && today ? Math.max(1, this._dayDiff(model.todayIso, lastStart) + 1) : null;
+    const viewIso = this._isoFromDate(this._viewDate || new Date());
+    const selectedCycle = (model.phaseRanges || []).find((cycle) => cycle.start && cycle.end
+      && this._dayDiff(viewIso, cycle.start) >= 0 && this._dayDiff(cycle.end, viewIso) >= 0);
+    const cycleAnchor = selectedCycle?.start || lastStart;
+    const cycleDay = cycleAnchor ? Math.max(1, this._dayDiff(viewIso, cycleAnchor) + 1) : null;
     const average = Number.isFinite(model.averageCycleLength) ? Math.round(model.averageCycleLength) : null;
     const variability = Number.isFinite(model.variability) ? Math.round(model.variability) : null;
     const confidence = Number.isFinite(model.predictionConfidence) ? Math.round(model.predictionConfidence * 100) : null;
@@ -511,10 +511,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ['luteal', 'Luteal', '#1e3a8a']
     ];
     const phaseItems = phaseDefinitions.map(([key, label, color]) => {
-      const phase = model.phases[key] || {};
-      const active = phase.start && phase.end && this._dayDiff(model.todayIso, phase.start) >= 0
-        && this._dayDiff(phase.end, model.todayIso) >= 0;
-      return `<div class="phase-item ${active ? 'is-current' : ''}"><span class="phase-dot" style="background:${color}"></span><span>${label}</span>${active ? '<strong>Now</strong>' : ''}</div>`;
+      const phase = selectedCycle?.[key] || model.phases[key] || {};
+      const active = phase.start && phase.end && this._dayDiff(viewIso, phase.start) >= 0
+        && this._dayDiff(phase.end, viewIso) >= 0;
+      const predicted = selectedCycle?.predicted;
+      return `<div class="phase-item ${active ? 'is-current' : ''}${predicted ? ' is-predicted' : ''}"><span class="phase-dot" style="background:${color}"></span><span>${label}</span>${active ? `<strong>${predicted ? 'Expected' : 'Selected'}</strong>` : ''}</div>`;
     }).join('');
     const progress = average && cycleDay ? Math.min(100, Math.max(4, (cycleDay / average) * 100)) : 8;
 
@@ -729,7 +730,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
   _attachHandlers() {
     this.shadowRoot.querySelectorAll('[data-view-mode]').forEach((button) => {
       button.addEventListener('click', () => {
-        this._viewMode = button.getAttribute('data-view-mode') === 'details' ? 'details' : 'gauge';
+        const requestedMode = button.getAttribute('data-view-mode');
+        this._viewMode = ['gauge', 'calendar', 'details'].includes(requestedMode) ? requestedMode : 'gauge';
         this._render();
       });
     });
@@ -963,19 +965,17 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           ${this._renderGauge(model, palette)}
           <div class="center"><span class="countdown">${countdown}</span></div>
           </div>` : viewMode === 'details' ? this._renderCycleOverview(model) : ''}
-          ${viewMode === 'calendar' ? `<div class="toolbar">
-          <div class="title">Calendar</div>
+          <div class="toolbar">
+          <div class="title">${monthYear}</div>
             <div class="nav">
               <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
               <button type="button" class="btn" data-nav="today">Today</button>
               <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
             </div>
           </div>
+          ${viewMode === 'calendar' ? `
           ${this._config.show_editor !== false ? `
           <div class="editor">
-            <div class="toolbar">
-              <div class="title">${monthYear}</div>
-            </div>
             ${String(this._config?.calendar_selection_mode || 'range').toLowerCase() === 'range'
               ? `<div class="range-help">${this._rangeStart && !this._rangeEnd ? `Start selected: <strong>${this._rangeStart}</strong> — click the end date` : 'Click the first day, then the last day of the cycle.'} Right-click a saved range (or hold it on mobile) to delete it.</div>`
               : ''}
@@ -986,7 +986,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               <span class="phase-key"><span class="phase-dot" style="background:#60a5fa"></span>Ovulation</span>
               <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
             </div>
-          </div>` : ''}
+          </div>` : ''}` : ''}
           <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh forecast</button></div>
         </div>
       </ha-card>
@@ -1245,12 +1245,16 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
   }
 }
 
-customElements.define('menstrual-cycle-gauge-card', MenstrualCycleGaugeCard);
-customElements.define('menstrual-cycle-gauge-card-editor', MenstrualCycleGaugeCardEditor);
+if (!customElements.get('menstrual-cycle-gauge-card')) {
+  customElements.define('menstrual-cycle-gauge-card', MenstrualCycleGaugeCard);
+}
+if (!customElements.get('menstrual-cycle-gauge-card-editor')) {
+  customElements.define('menstrual-cycle-gauge-card-editor', MenstrualCycleGaugeCardEditor);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstrual-cycle-gauge-card',
-  name: 'Menstrual Cycle Gauge Card',
-  description: 'Cycle gauge with profile support and visual editor (entity/entry_id/theme/flags).'
+  name: 'Menstrual Cycle Companion',
+  description: 'Cycle gauge, calendar, and details card with profile support.'
 });
