@@ -493,7 +493,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const viewIso = this._isoFromDate(this._viewDate || new Date());
     const selectedCycle = (model.phaseRanges || []).find((cycle) => cycle.start && cycle.end
       && this._dayDiff(viewIso, cycle.start) >= 0 && this._dayDiff(cycle.end, viewIso) >= 0);
-    const cycleAnchor = selectedCycle?.start || lastStart;
+    const now = new Date();
+    const isCurrentViewMonth = this._viewDate.getFullYear() === now.getFullYear()
+      && this._viewDate.getMonth() === now.getMonth();
+    const cycleAnchor = selectedCycle?.start || (isCurrentViewMonth ? lastStart : '');
     const cycleDay = cycleAnchor ? Math.max(1, this._dayDiff(viewIso, cycleAnchor) + 1) : null;
     const average = Number.isFinite(model.averageCycleLength) ? Math.round(model.averageCycleLength) : null;
     const variability = Number.isFinite(model.variability) ? Math.round(model.variability) : null;
@@ -511,7 +514,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ['luteal', 'Luteal', '#1e3a8a']
     ];
     const phaseItems = phaseDefinitions.map(([key, label, color]) => {
-      const phase = selectedCycle?.[key] || model.phases[key] || {};
+      const phase = selectedCycle?.[key] || (isCurrentViewMonth ? model.phases[key] : {});
       const active = phase.start && phase.end && this._dayDiff(viewIso, phase.start) >= 0
         && this._dayDiff(phase.end, viewIso) >= 0;
       const predicted = selectedCycle?.predicted;
