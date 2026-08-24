@@ -886,6 +886,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         }
         .wrap { display: grid; gap: 16px; }
         .head { display: grid; gap: 3px; padding: 1px 2px 0; }
+        .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
         .friendly { font-size: .78rem; font-weight: 500; color: var(--secondary-text-color); text-align: left; }
         .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: -4px auto 0; }
@@ -960,22 +961,24 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
-        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .card-header { align-items: stretch; flex-direction: column; gap: 10px; } .toolbar { justify-content: flex-start; } .month-control { justify-items: start; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
       </style>
       <ha-card>
         <div class="wrap">
-          ${(friendlyName || cardTitle) ? `
-          <div class="head">
-            ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
-            ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
-          </div>` : ''}
-          <div class="toolbar">
-            <div class="month-control">
-              <div class="title">${monthYear}</div>
-              <div class="nav">
-                <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
-                <button type="button" class="btn" data-nav="today">Today</button>
-                <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
+          <div class="card-header">
+            ${(friendlyName || cardTitle) ? `
+            <div class="head">
+              ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
+              ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
+            </div>` : '<div></div>'}
+            <div class="toolbar">
+              <div class="month-control">
+                <div class="title">${monthYear}</div>
+                <div class="nav">
+                  <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
+                  <button type="button" class="btn" data-nav="today">Today</button>
+                  <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
+                </div>
               </div>
             </div>
           </div>
