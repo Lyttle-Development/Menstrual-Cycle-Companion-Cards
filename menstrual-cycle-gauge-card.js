@@ -523,10 +523,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ['ovulation', 'Ovulation', '#60a5fa'],
       ['luteal', 'Luteal', '#1e3a8a']
     ];
-    const cycleOptions = (model.phaseRanges || []).map((cycle) => {
-      const label = `${dateLabel(cycle.start, { month: 'short', day: 'numeric', year: 'numeric' })} – ${dateLabel(cycle.end, { month: 'short', day: 'numeric', year: 'numeric' })}${cycle.predicted ? ' (expected)' : ''}`;
-      return `<option value="${cycle.start}" ${selectedCycle?.start === cycle.start ? 'selected' : ''}>${label}</option>`;
-    }).join('');
     const selectedKey = phaseDefinitions.some(([key]) => key === this._selectedDetailsPhase)
       ? this._selectedDetailsPhase
       : (model.state === 'period' ? 'menstruation' : model.state);
@@ -547,10 +543,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     return `
       <section class="overview details-overview" aria-label="Cycle details">
         <div class="overview-main">
-          <div class="details-heading">
-            <div class="eyebrow">Cycle progress</div>
-            ${cycleOptions ? `<label class="cycle-select-label">Date<select data-cycle-select aria-label="Select cycle date">${cycleOptions}</select></label>` : ''}
-          </div>
+          <div class="eyebrow">Cycle progress</div>
           <div class="phase-tabs" role="tablist" aria-label="Cycle phase">${phaseItems}</div>
           <div class="phase-detail">
             <div class="phase-detail-title"><span class="phase-dot" style="background:${selectedDefinition[2]}"></span><strong>${selectedDefinition[1]}</strong>${phaseIsPredicted ? '<span class="phase-badge">Expected</span>' : phaseIsCurrent ? '<span class="phase-badge">Current</span>' : ''}</div>
@@ -761,12 +754,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         this._render();
       });
     });
-    this.shadowRoot.querySelector('[data-cycle-select]')?.addEventListener('change', (event) => {
-      const selectedStart = this._parseISO(event.target.value);
-      if (!selectedStart) return;
-      this._viewDate = new Date(selectedStart.getFullYear(), selectedStart.getMonth(), 1, 12);
-      this._render();
-    });
     this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
       this._render();
@@ -911,9 +898,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
         .overview-main { min-width: 0; }
         .overview, .overview * { user-select: text; -webkit-user-select: text; }
-        .details-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-        .cycle-select-label { display: grid; gap: 3px; min-width: 0; color: var(--secondary-text-color); font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; text-align: right; }
-        .cycle-select-label select { max-width: 220px; border: 1px solid var(--divider-color); border-radius: 8px; padding: 5px 7px; background: var(--card-background-color); color: var(--primary-text-color); font: inherit; font-size: .72rem; text-transform: none; letter-spacing: normal; cursor: pointer; }
         .phase-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
         .phase-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; padding: 8px 6px; border: 1px solid transparent; border-radius: 9px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--secondary-text-color); font: inherit; font-size: .7rem; cursor: pointer; }
         .phase-tab.active { border-color: color-mix(in srgb, var(--primary-color) 40%, transparent); background: color-mix(in srgb, var(--primary-color) 14%, transparent); color: var(--primary-text-color); font-weight: 600; }
@@ -946,7 +930,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .view-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 11px; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
         .view-switch button { border: 0; border-radius: 8px; padding: 8px 10px; background: transparent; color: var(--secondary-text-color); font: inherit; font-size: .74rem; cursor: pointer; transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
         .view-switch button.active { background: var(--primary-color); color: var(--text-primary-color, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
-        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 2px; }
+        .toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 2px; }
+        .month-control { display: grid; justify-items: end; gap: 5px; }
         .title { font-weight: 700; color: var(--primary-text-color); }
         .nav { display: inline-flex; gap: 6px; }
         .btn { border: 1px solid var(--divider-color); border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; transition: background 140ms ease, transform 140ms ease; }
@@ -975,7 +960,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
-        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .details-heading { flex-direction: column; } .cycle-select-label { width: 100%; text-align: left; } .cycle-select-label select { max-width: none; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
       </style>
       <ha-card>
         <div class="wrap">
@@ -984,6 +969,16 @@ class MenstrualCycleGaugeCard extends HTMLElement {
             ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
             ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
           </div>` : ''}
+          <div class="toolbar">
+            <div class="month-control">
+              <div class="title">${monthYear}</div>
+              <div class="nav">
+                <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
+                <button type="button" class="btn" data-nav="today">Today</button>
+                <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
+              </div>
+            </div>
+          </div>
           <div class="view-switch" role="tablist" aria-label="Cycle view">
           <button type="button" class="${viewMode === 'gauge' ? 'active' : ''}" data-view-mode="gauge" role="tab" aria-selected="${viewMode === 'gauge'}">Gauge</button>
           <button type="button" class="${viewMode === 'calendar' ? 'active' : ''}" data-view-mode="calendar" role="tab" aria-selected="${viewMode === 'calendar'}">Calendar</button>
@@ -993,14 +988,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           ${this._renderGauge(model, palette)}
           <div class="center"><span class="countdown">${countdown}</span></div>
           </div>` : viewMode === 'details' ? this._renderCycleOverview(model) : ''}
-          <div class="toolbar">
-          <div class="title">${monthYear}</div>
-            <div class="nav">
-              <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
-              <button type="button" class="btn" data-nav="today">Today</button>
-              <button type="button" class="btn" data-nav="next" aria-label="Next month">→</button>
-            </div>
-          </div>
           ${viewMode === 'calendar' ? `
           ${this._config.show_editor !== false ? `
           <div class="editor">
