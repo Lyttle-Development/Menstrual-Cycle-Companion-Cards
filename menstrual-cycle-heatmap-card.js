@@ -391,11 +391,16 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         ha-card {
           --cell-size: 11px;
           --cell-gap: 2px;
-          padding: 16px;
+          display: block;
+          padding: 18px;
+          border: 1px solid var(--ha-card-border-color, var(--divider-color));
+          border-radius: 16px;
+          background: var(--ha-card-background, var(--card-background-color));
+          box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, .08));
         }
         .title {
           font-weight: 600;
-          margin: 0 0 12px;
+          margin: 0 0 16px;
           color: var(--primary-text-color);
         }
         .wrap {
@@ -480,9 +485,9 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         .cell {
           width: var(--cell-size);
           height: var(--cell-size);
-          border-radius: 2px;
-          background: transparent;
-          border: 1px solid rgba(120, 120, 120, 0.35);
+          border-radius: 5px;
+          background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 12%, transparent);
           box-sizing: border-box;
           position: relative;
           overflow: hidden;
@@ -552,7 +557,7 @@ class MenstrualCycleHeatmapCard extends HTMLElement {
         .legend-swatch {
           width: 10px;
           height: 10px;
-          border-radius: 2px;
+          border-radius: 4px;
         }
       </style>
       <ha-card>

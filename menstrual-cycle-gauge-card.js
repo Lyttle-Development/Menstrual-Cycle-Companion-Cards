@@ -206,10 +206,10 @@ class MenstrualCycleGaugeCard extends HTMLElement {
   }
 
   _stateBg(state) {
-    if (state === 'period') return 'linear-gradient(135deg, rgba(252,231,243,.97), rgba(255,241,246,.95))';
-    if (state === 'fertile') return 'linear-gradient(135deg, rgba(254,252,232,.97), rgba(255,255,255,.95))';
-    if (state === 'pms') return 'linear-gradient(135deg, rgba(255,241,246,.96), rgba(255,250,252,.94))';
-    return 'linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,255,255,.95))';
+    if (state === 'period') return 'linear-gradient(135deg, rgba(255,245,247,.98), rgba(255,255,255,.98))';
+    if (state === 'fertile') return 'linear-gradient(135deg, rgba(255,252,239,.98), rgba(255,255,255,.98))';
+    if (state === 'pms') return 'linear-gradient(135deg, rgba(255,247,250,.98), rgba(255,255,255,.98))';
+    return 'var(--ha-card-background, var(--card-background-color, #fff))';
   }
 
   _resolveThemeMode() {
@@ -247,12 +247,12 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     }
 
     const bg = state === 'period'
-      ? 'linear-gradient(135deg, rgba(52,16,31,.98), rgba(27,11,20,.98))'
+      ? 'linear-gradient(135deg, rgba(50,35,40,.98), rgba(32,29,32,.98))'
       : state === 'fertile'
-        ? 'linear-gradient(135deg, rgba(43,41,18,.98), rgba(20,20,16,.98))'
+        ? 'linear-gradient(135deg, rgba(45,43,32,.98), rgba(31,31,29,.98))'
         : state === 'pms'
-          ? 'linear-gradient(135deg, rgba(44,19,34,.98), rgba(20,14,21,.98))'
-          : 'linear-gradient(135deg, rgba(26,19,27,.98), rgba(17,15,20,.98))';
+          ? 'linear-gradient(135deg, rgba(48,37,43,.98), rgba(31,29,32,.98))'
+          : 'var(--ha-card-background, var(--card-background-color, #1c1c1c))';
 
     return {
       cardBg: bg,
@@ -772,38 +772,49 @@ class MenstrualCycleGaugeCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
+        :host { display: block; }
         ha-card {
-          padding: 16px;
+          display: block;
+          padding: 18px;
           overflow: hidden;
+          border: 1px solid var(--ha-card-border-color, var(--divider-color));
+          border-radius: 16px;
+          background: ${palette.cardBg};
+          color: var(--primary-text-color);
+          box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, .08));
         }
-        .wrap { display: grid; gap: 10px; }
-        .head { display: grid; gap: 2px; }
-        .friendly { font-size: .78rem; font-weight: 600; color: var(--secondary-text-color); text-align: left; }
+        .wrap { display: grid; gap: 12px; }
+        .head { display: grid; gap: 3px; padding: 1px 2px 0; }
+        .friendly { font-size: .78rem; font-weight: 500; color: var(--secondary-text-color); text-align: left; }
         .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
         .gauge { width: 100%; height: 100%; display: block; }
         .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
         .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-        .countdown { pointer-events: auto; border: 1px solid var(--divider-color); border-radius: 4px; padding: 8px 12px; background: var(--primary-color); cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); }
+        .countdown { pointer-events: auto; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--primary-color); cursor: pointer; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
         .countdown.overdue-soon { border-style: dashed; border-width: 2px; }
         .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
-        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .title { font-weight: 700; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 2px; }
+        .title { font-weight: 700; color: var(--primary-text-color); }
         .nav { display: inline-flex; gap: 6px; }
-        .btn { border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; }
+        .btn { border: 1px solid var(--divider-color); border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; transition: background 140ms ease, transform 140ms ease; }
+        .btn:hover { background: color-mix(in srgb, var(--primary-color) 12%, transparent); }
+        .btn:active { transform: scale(.97); }
         .refresh-row { display: flex; justify-content: center; }
         .refresh-btn { font-size: .82rem; }
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
-        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
-        .day { min-height: 32px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; }
+        .day { min-height: 34px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--primary-text-color); cursor: pointer; font: inherit; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
+        .day:hover { border-color: color-mix(in srgb, var(--primary-color) 55%, transparent); background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
+        .day:active { transform: scale(.96); }
         .day.active { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
         .day.phase-menstruation { box-shadow: inset 0 -4px 0 #fb7185; }
         .day.phase-follicular { box-shadow: inset 0 -4px 0 #f59e0b; }
         .day.phase-ovulation { box-shadow: inset 0 -4px 0 #60a5fa; }
         .day.phase-luteal { box-shadow: inset 0 -4px 0 #1e3a8a; }
-        .day.range-start { border-radius: 12px 4px 4px 12px; }
-        .day.range-end { border-radius: 4px 12px 12px 4px; }
+        .day.range-start { border-radius: 12px 6px 6px 12px; }
+        .day.range-end { border-radius: 6px 12px 12px 6px; }
         .day.pending-range { background: color-mix(in srgb, var(--primary-color) 24%, var(--card-background-color)); border-color: var(--primary-color); box-shadow: inset 0 -3px 0 var(--primary-color); }
         .day.today { outline: 2px solid var(--primary-color); }
         .day.other { opacity: .3; }
