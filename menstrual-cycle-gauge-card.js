@@ -897,16 +897,20 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
         .countdown { pointer-events: none; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--primary-color); font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--text-primary-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, .14); }
         .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
+        .details-overview { grid-template-columns: 1fr; gap: 16px; padding: 20px; }
         .overview-main { min-width: 0; }
         .overview, .overview * { user-select: text; -webkit-user-select: text; }
-        .phase-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
-        .phase-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; padding: 8px 6px; border: 1px solid transparent; border-radius: 9px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--secondary-text-color); font: inherit; font-size: .7rem; cursor: pointer; }
+        .phase-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 12px 0 14px; }
+        .phase-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 7px; border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); color: var(--secondary-text-color); font: inherit; font-size: .72rem; cursor: pointer; transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease; }
+        .phase-tab:active { transform: scale(.98); }
         .phase-tab.active { border-color: color-mix(in srgb, var(--primary-color) 40%, transparent); background: color-mix(in srgb, var(--primary-color) 14%, transparent); color: var(--primary-text-color); font-weight: 600; }
-        .phase-detail { display: grid; gap: 5px; padding: 14px; border-radius: 11px; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); }
+        .phase-detail { display: grid; gap: 7px; padding: 16px; border: 1px solid color-mix(in srgb, var(--primary-color) 18%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); }
         .phase-detail-title { display: flex; align-items: center; gap: 7px; font-size: 1rem; }
         .phase-detail-range { color: var(--secondary-text-color); font-size: .78rem; }
         .phase-badge { margin-left: auto; color: var(--primary-color); font-size: .64rem; text-transform: uppercase; }
-        .phase-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+        .phase-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+        .phase-stat-grid .stat { min-width: 0; padding: 12px; }
+        .phase-stat-grid .stat strong { overflow-wrap: anywhere; }
         .eyebrow, .stat-label { color: var(--secondary-text-color); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
         .phase-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
         .phase-item { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: 999px; color: var(--secondary-text-color); font-size: .72rem; }
@@ -918,7 +922,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .cycle-marker { position: absolute; top: 50%; width: 16px; height: 16px; border: 3px solid var(--ha-card-background, var(--card-background-color)); border-radius: 50%; background: var(--primary-color); transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
         .track-labels { display: flex; justify-content: space-between; color: var(--secondary-text-color); font-size: .66rem; }
         .track-labels span:nth-child(2) { text-align: center; }
-        .overview-stats { display: grid; gap: 8px; align-content: center; }
+        .overview-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: center; }
         .stat { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); }
         .stat strong { font-size: 1rem; }
         .stat small { color: var(--secondary-text-color); font-size: .68rem; }
@@ -961,7 +965,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
-        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .card-header { align-items: stretch; flex-direction: column; gap: 10px; } .toolbar { justify-content: flex-start; } .month-control { justify-items: start; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .card-header { align-items: stretch; flex-direction: column; gap: 10px; } .toolbar { justify-content: flex-start; } .month-control { justify-items: start; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } .overview-stats { grid-template-columns: 1fr; } }
       </style>
       <ha-card>
         <div class="wrap">
