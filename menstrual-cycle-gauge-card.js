@@ -32,6 +32,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     this._viewDate = new Date();
     const configuredView = String(this._config.view_mode || 'gauge').toLowerCase();
     this._viewMode = ['gauge', 'calendar', 'details'].includes(configuredView) ? configuredView : 'gauge';
+    this._selectedDetailsPhase = null;
     this._editorOpen = false;
     this._lastRenderedStateObj = null;
     this._lastRenderedEntityId = null;
@@ -522,27 +523,38 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ['ovulation', 'Ovulation', '#60a5fa'],
       ['luteal', 'Luteal', '#1e3a8a']
     ];
-    const cycleOptions = (model.phaseRanges || []).map((cycle) => {
-      const label = `${dateLabel(cycle.start, { month: 'short', day: 'numeric', year: 'numeric' })} – ${dateLabel(cycle.end, { month: 'short', day: 'numeric', year: 'numeric' })}${cycle.predicted ? ' (expected)' : ''}`;
-      return `<option value="${cycle.start}" ${selectedCycle?.start === cycle.start ? 'selected' : ''}>${label}</option>`;
-    }).join('');
+    const selectedKey = phaseDefinitions.some(([key]) => key === this._selectedDetailsPhase)
+      ? this._selectedDetailsPhase
+      : (model.state === 'period' ? 'menstruation' : model.state);
+    const selectedDefinition = phaseDefinitions.find(([key]) => key === selectedKey) || phaseDefinitions[0];
+    const selectedPhase = selectedCycle?.[selectedDefinition[0]]
+      || (isCurrentViewMonth ? model.phases[selectedDefinition[0]] : {});
+    const phaseDuration = selectedPhase.start && selectedPhase.end
+      ? this._dayDiff(selectedPhase.end, selectedPhase.start) + 1
+      : null;
+    const phaseIsCurrent = selectedPhase.start && selectedPhase.end
+      && this._dayDiff(viewIso, selectedPhase.start) >= 0
+      && this._dayDiff(selectedPhase.end, viewIso) >= 0;
+    const phaseIsPredicted = Boolean(selectedCycle?.predicted);
     const phaseItems = phaseDefinitions.map(([key, label, color]) => {
-      const phase = selectedCycle?.[key] || (isCurrentViewMonth ? model.phases[key] : {});
-      const active = phase.start && phase.end && this._dayDiff(viewIso, phase.start) >= 0
-        && this._dayDiff(phase.end, viewIso) >= 0;
-      const predicted = selectedCycle?.predicted;
-      return `<div class="phase-item ${active ? 'is-current' : ''}${predicted ? ' is-predicted' : ''}"><span class="phase-dot" style="background:${color}"></span><span>${label}</span>${active ? `<strong>${predicted ? 'Expected' : 'Selected'}</strong>` : ''}</div>`;
+      const isSelected = key === selectedDefinition[0];
+      return `<button type="button" class="phase-tab ${isSelected ? 'active' : ''}" data-details-phase="${key}" aria-pressed="${isSelected}"><span class="phase-dot" style="background:${color}"></span>${label}</button>`;
     }).join('');
-    const progress = average && cycleDay ? Math.min(100, Math.max(4, (cycleDay / average) * 100)) : 8;
-
     return `
-      <section class="overview" aria-label="Cycle overview">
+      <section class="overview details-overview" aria-label="Cycle details">
         <div class="overview-main">
-          <div class="details-heading"><div class="eyebrow">Cycle progress</div>${cycleOptions ? `<label class="cycle-select-label">Cycle<select data-cycle-select aria-label="Select cycle">${cycleOptions}</select></label>` : ''}</div>
-          <div class="phase-list">${phaseItems}</div>
-          <div class="cycle-position">${cycleDay ? `Cycle day ${cycleDay}` : 'Add a cycle start to begin tracking'}</div>
-          <div class="cycle-track" aria-hidden="true"><span class="cycle-fill" style="width:${progress}%"></span><span class="cycle-marker" style="left:${progress}%"></span></div>
-          <div class="track-labels"><span>Start</span><span>${average ? `Typical cycle · ${average} days` : 'Typical cycle'}</span><span>Next</span></div>
+          <div class="eyebrow">Cycle progress</div>
+          <div class="phase-tabs" role="tablist" aria-label="Cycle phase">${phaseItems}</div>
+          <div class="phase-detail">
+            <div class="phase-detail-title"><span class="phase-dot" style="background:${selectedDefinition[2]}"></span><strong>${selectedDefinition[1]}</strong>${phaseIsPredicted ? '<span class="phase-badge">Expected</span>' : phaseIsCurrent ? '<span class="phase-badge">Current</span>' : ''}</div>
+            <div class="phase-detail-range">${selectedPhase.start ? `${dateLabel(selectedPhase.start, { month: 'short', day: 'numeric', year: 'numeric' })} – ${dateLabel(selectedPhase.end, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'No calculated dates for this phase'}</div>
+          </div>
+          <div class="phase-stat-grid">
+            <div class="stat"><span class="stat-label">Duration</span><strong>${phaseDuration ? `${phaseDuration} days` : '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Cycle day</span><strong>${cycleDay || '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Cycle length</span><strong>${average ? `${average} days` : '--'}</strong></div>
+            <div class="stat"><span class="stat-label">Cycle type</span><strong>${phaseIsPredicted ? 'Forecast' : selectedCycle ? 'Recorded' : '--'}</strong></div>
+          </div>
         </div>
         <div class="overview-stats">
           <div class="stat"><span class="stat-label">Next guess</span><strong>${dateLabel(next)}</strong><small>${next ? 'predicted start' : 'not enough data'}</small></div>
@@ -724,23 +736,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     try {
       await this._hass.callService('homeassistant', 'update_entity', { entity_id: eid });
     } catch (_) {
-      // Ignore environments where update_entity is unavailable.
+      // Some Home Assistant installations update the entity automatically.
     }
-  }
-
-  async _refreshCycleModel() {
-    const model = this._buildModel();
-    const profile = model.stateObj?.attributes?.profile;
-    const entityId = model.entityId || this._config?.entity || '';
-    const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
-    const payload = {
-      ...(entityId ? { entity_id: entityId } : {}),
-      ...(profile ? { profile } : {}),
-      ...(entryId ? { entry_id: entryId } : {})
-    };
-    await this._hass.callService('menstrual_cycle_companion', 'refresh_cycle_model', payload);
-    await this._refreshSensorEntity(entityId);
-    this._render();
   }
 
   _attachHandlers() {
@@ -751,25 +748,11 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         this._render();
       });
     });
-    this.shadowRoot.querySelector('[data-action="refresh-model"]')?.addEventListener('click', async () => {
-      const button = this.shadowRoot.querySelector('[data-action="refresh-model"]');
-      if (button) button.disabled = true;
-      try {
-        await this._refreshCycleModel();
-      } catch (err) {
-        // Keep a visible trace in browser console when the refresh service rejects.
-        // eslint-disable-next-line no-console
-        console.error('menstrual-cycle-gauge-card: failed to refresh cycle model', err);
-      } finally {
-        const refreshedButton = this.shadowRoot.querySelector('[data-action="refresh-model"]');
-        if (refreshedButton) refreshedButton.disabled = false;
-      }
-    });
-    this.shadowRoot.querySelector('[data-cycle-select]')?.addEventListener('change', (event) => {
-      const selectedStart = this._parseISO(event.target.value);
-      if (!selectedStart) return;
-      this._viewDate = new Date(selectedStart.getFullYear(), selectedStart.getMonth(), 1, 12);
-      this._render();
+    this.shadowRoot.querySelectorAll('[data-details-phase]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this._selectedDetailsPhase = button.getAttribute('data-details-phase');
+        this._render();
+      });
     });
     this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
@@ -915,9 +898,14 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); gap: 14px; padding: 18px; border-radius: 14px; background: color-mix(in srgb, var(--primary-color) 7%, transparent); }
         .overview-main { min-width: 0; }
         .overview, .overview * { user-select: text; -webkit-user-select: text; }
-        .details-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-        .cycle-select-label { display: grid; gap: 3px; color: var(--secondary-text-color); font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; }
-        .cycle-select-label select { max-width: 190px; border: 1px solid var(--divider-color); border-radius: 8px; padding: 5px 7px; background: var(--card-background-color); color: var(--primary-text-color); font: inherit; font-size: .72rem; text-transform: none; letter-spacing: normal; cursor: pointer; }
+        .phase-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+        .phase-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; padding: 8px 6px; border: 1px solid transparent; border-radius: 9px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--secondary-text-color); font: inherit; font-size: .7rem; cursor: pointer; }
+        .phase-tab.active { border-color: color-mix(in srgb, var(--primary-color) 40%, transparent); background: color-mix(in srgb, var(--primary-color) 14%, transparent); color: var(--primary-text-color); font-weight: 600; }
+        .phase-detail { display: grid; gap: 5px; padding: 14px; border-radius: 11px; background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); }
+        .phase-detail-title { display: flex; align-items: center; gap: 7px; font-size: 1rem; }
+        .phase-detail-range { color: var(--secondary-text-color); font-size: .78rem; }
+        .phase-badge { margin-left: auto; color: var(--primary-color); font-size: .64rem; text-transform: uppercase; }
+        .phase-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
         .eyebrow, .stat-label { color: var(--secondary-text-color); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
         .phase-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
         .phase-item { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: 999px; color: var(--secondary-text-color); font-size: .72rem; }
@@ -948,8 +936,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .btn { border: 1px solid var(--divider-color); border-radius: 10px; background: color-mix(in srgb, var(--primary-text-color) 5%, transparent); color: var(--primary-text-color); padding: 8px 12px; cursor: pointer; font: inherit; transition: background 140ms ease, transform 140ms ease; }
         .btn:hover { background: color-mix(in srgb, var(--primary-color) 12%, transparent); }
         .btn:active { transform: scale(.97); }
-        .refresh-row { display: flex; justify-content: center; }
-        .refresh-btn { font-size: .82rem; }
         .editor { display: grid; gap: 10px; padding-top: 4px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
@@ -973,7 +959,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .phase-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .72rem; color: var(--secondary-text-color); }
         .phase-key { display: inline-flex; align-items: center; gap: 4px; }
         .phase-dot { width: 9px; height: 9px; border-radius: 50%; }
-        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 420px) { .overview { grid-template-columns: 1fr; } .stats-row, .phase-stat-grid { grid-template-columns: repeat(2, 1fr); } .phase-tabs { grid-template-columns: repeat(2, 1fr); } }
       </style>
       <ha-card>
         <div class="wrap">
@@ -1013,7 +999,6 @@ class MenstrualCycleGaugeCard extends HTMLElement {
               <span class="phase-key"><span class="phase-dot" style="background:#1e3a8a"></span>Luteal</span>
             </div>
           </div>` : ''}` : ''}
-          <div class="refresh-row"><button type="button" class="btn refresh-btn" data-action="refresh-model">↻ Refresh forecast</button></div>
         </div>
       </ha-card>
     `;
@@ -1125,28 +1110,30 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        .wrap { display: grid; gap: 12px; padding: 8px 0; }
+        .wrap { display: grid; gap: 16px; padding: 0; }
         .row { display: grid; gap: 4px; }
         .inline { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
         .entity { display: grid; gap: 6px; }
         .entity-fallback { display: grid; gap: 6px; }
-        label { font-size: 12px; font-weight: 500; color: var(--secondary-text-color); }
+        label { font-size: 14px; font-weight: 400; color: var(--primary-text-color); }
         input, select, button, ha-entity-picker, ha-selector { width: 100%; box-sizing: border-box; }
         input, select {
           font: inherit;
-          padding: 8px;
-          border: 1px solid var(--divider-color);
+          min-height: 40px;
+          padding: 0 12px;
+          border: 1px solid var(--input-border-color, var(--divider-color));
           border-radius: 4px;
-          background: var(--card-background-color);
+          background: var(--input-fill-color, transparent);
           color: var(--primary-text-color);
         }
         button {
           width: auto;
-          padding: 8px 12px;
-          border: 1px solid var(--divider-color);
+          min-height: 40px;
+          padding: 0 16px;
+          border: 0;
           border-radius: 4px;
-          background: transparent;
-          color: var(--primary-text-color);
+          background: var(--primary-color);
+          color: var(--text-primary-color, #fff);
           font: inherit;
           cursor: pointer;
         }
