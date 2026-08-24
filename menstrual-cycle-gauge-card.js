@@ -8,7 +8,7 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       entry_id: '',
       friendly_name: '',
       theme_mode: 'auto',
-      title: 'Cycle Gauge',
+      title: 'Cycle Companion',
       view_mode: 'gauge',
       show_fertile_period: true,
       calendar_edit_enabled: true,
@@ -32,7 +32,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
       ...config
     };
     this._viewDate = new Date();
-    this._viewMode = String(this._config.view_mode || 'gauge').toLowerCase() === 'details' ? 'details' : 'gauge';
+    const configuredView = String(this._config.view_mode || 'gauge').toLowerCase();
+    this._viewMode = ['gauge', 'calendar', 'details'].includes(configuredView) ? configuredView : 'gauge';
     this._editorOpen = false;
     this._lastRenderedStateObj = null;
     this._lastRenderedEntityId = null;
@@ -858,7 +859,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
     const cardTitle = String(this._config.title || '').trim();
     const friendlyName = String(this._config.friendly_name || model.stateObj?.attributes?.friendly_name || '').trim();
     const canEdit = this._config?.calendar_edit_enabled !== false;
-    const viewMode = this._viewMode || (String(this._config.view_mode || 'gauge').toLowerCase() === 'details' ? 'details' : 'gauge');
+    const configuredView = String(this._config.view_mode || 'gauge').toLowerCase();
+    const viewMode = this._viewMode || (['gauge', 'calendar', 'details'].includes(configuredView) ? configuredView : 'gauge');
     const daysUntil = Number(model.stateObj?.attributes?.days_until_next_start);
     const countdown = Number.isFinite(daysUntil) ? `${daysUntil} days` : '-- days';
 
@@ -880,6 +882,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .friendly { font-size: .78rem; font-weight: 500; color: var(--secondary-text-color); text-align: left; }
         .title-label { font-size: .95rem; font-weight: 700; color: var(--primary-text-color); text-align: left; }
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: -4px auto 0; }
+        .gauge-wrap, .overview, .editor { animation: view-fade 180ms ease both; }
+        @keyframes view-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         .gauge { width: 100%; height: 100%; display: block; }
         .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
         .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -907,8 +911,8 @@ class MenstrualCycleGaugeCard extends HTMLElement {
         .stat-pill span { color: var(--secondary-text-color); font-size: .66rem; }
         .prediction-strip { display: flex; align-items: center; gap: 8px; color: var(--secondary-text-color); font-size: .72rem; }
         .prediction-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 0 4px color-mix(in srgb, #60a5fa 16%, transparent); }
-        .view-switch { display: inline-flex; align-self: start; padding: 3px; border-radius: 11px; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
-        .view-switch button { border: 0; border-radius: 8px; padding: 6px 10px; background: transparent; color: var(--secondary-text-color); font: inherit; font-size: .72rem; cursor: pointer; }
+        .view-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 11px; background: color-mix(in srgb, var(--primary-text-color) 7%, transparent); }
+        .view-switch button { border: 0; border-radius: 8px; padding: 8px 10px; background: transparent; color: var(--secondary-text-color); font: inherit; font-size: .74rem; cursor: pointer; transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
         .view-switch button.active { background: var(--primary-color); color: var(--text-primary-color, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 2px; }
         .title { font-weight: 700; color: var(--primary-text-color); }
@@ -952,14 +956,15 @@ class MenstrualCycleGaugeCard extends HTMLElement {
           </div>` : ''}
           <div class="view-switch" role="tablist" aria-label="Cycle view">
           <button type="button" class="${viewMode === 'gauge' ? 'active' : ''}" data-view-mode="gauge" role="tab" aria-selected="${viewMode === 'gauge'}">Gauge</button>
+          <button type="button" class="${viewMode === 'calendar' ? 'active' : ''}" data-view-mode="calendar" role="tab" aria-selected="${viewMode === 'calendar'}">Calendar</button>
           <button type="button" class="${viewMode === 'details' ? 'active' : ''}" data-view-mode="details" role="tab" aria-selected="${viewMode === 'details'}">Details</button>
           </div>
           ${viewMode === 'gauge' ? `<div class="gauge-wrap">
           ${this._renderGauge(model, palette)}
           <div class="center"><span class="countdown">${countdown}</span></div>
-          </div>` : this._renderCycleOverview(model)}
-          <div class="toolbar">
-            <div class="title">Calendar</div>
+          </div>` : viewMode === 'details' ? this._renderCycleOverview(model) : ''}
+          ${viewMode === 'calendar' ? `<div class="toolbar">
+          <div class="title">Calendar</div>
             <div class="nav">
               <button type="button" class="btn" data-nav="prev" aria-label="Previous month">←</button>
               <button type="button" class="btn" data-nav="today">Today</button>
@@ -1028,6 +1033,7 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
         title: 'Title',
         view_mode: 'View',
         view_gauge: 'Gauge',
+        view_calendar: 'Calendar',
         view_details: 'Details',
         period_duration: 'Period Duration (number 1-14 or "learnt", empty = sensor value)',
         period_placeholder: 'e.g. 5 or "learnt"',
@@ -1148,6 +1154,7 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
           <label>${this._t('view_mode')}</label>
           <select id="view_mode">
             <option value="gauge" ${String(this._config.view_mode || 'gauge') === 'gauge' ? 'selected' : ''}>${this._t('view_gauge')}</option>
+            <option value="calendar" ${String(this._config.view_mode || 'gauge') === 'calendar' ? 'selected' : ''}>${this._t('view_calendar')}</option>
             <option value="details" ${String(this._config.view_mode || 'gauge') === 'details' ? 'selected' : ''}>${this._t('view_details')}</option>
           </select>
         </div>
@@ -1227,7 +1234,10 @@ class MenstrualCycleGaugeCardEditor extends HTMLElement {
       this._emit(next);
     });
     this.shadowRoot.getElementById('title')?.addEventListener('change', (ev) => this._handleInput('title', ev.target.value));
-    this.shadowRoot.getElementById('view_mode')?.addEventListener('change', (ev) => this._handleInput('view_mode', ev.target.value === 'details' ? 'details' : 'gauge'));
+    this.shadowRoot.getElementById('view_mode')?.addEventListener('change', (ev) => {
+      const value = ['gauge', 'calendar', 'details'].includes(ev.target.value) ? ev.target.value : 'gauge';
+      this._handleInput('view_mode', value);
+    });
     this.shadowRoot.getElementById('theme_mode')?.addEventListener('change', (ev) => this._handleInput('theme_mode', ev.target.value));
     this.shadowRoot.getElementById('show_fertile_period')?.addEventListener('change', (ev) => this._handleInput('show_fertile_period', !!ev.target.checked));
     this.shadowRoot.getElementById('calendar_edit_enabled')?.addEventListener('change', (ev) => this._handleInput('calendar_edit_enabled', !!ev.target.checked));

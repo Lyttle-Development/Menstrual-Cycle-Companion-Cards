@@ -46,16 +46,16 @@ calendar_selection_mode: range
 theme_mode: auto
 ```
 
-Click **Show editor** or the countdown area to open the month calendar. In the
-default `range` mode, click the first day and then the last day of the cycle.
+Use the top tabs to switch between **Gauge**, **Calendar**, and **Details**. In
+the **Calendar** tab, the default `range` mode lets you click the first day and
+then the last day of the cycle.
 The interval is highlighted while it is being selected and the completed range
 is shown with rounded start/end caps. Set `calendar_selection_mode: toggle` to
 use the original single-day add/remove behavior. The calendar can be navigated
 backward or forward without a date limit; use **Today** to return to the
 current month.
-Set `view_mode: details` to open directly on the statistics and forecast view;
-the in-card switch lets you change between **Gauge** and **Details** at any
-time.
+Set `view_mode: calendar` or `view_mode: details` to open directly on those
+views; the in-card tabs let you switch between all three at any time.
 
 ## Heatmap example
 
