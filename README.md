@@ -39,6 +39,7 @@ type: custom:menstrual-cycle-gauge-card
 entity: sensor.anna
 friendly_name: Anna
 title: Cycle gauge
+view_mode: gauge
 show_fertile_period: true
 calendar_edit_enabled: true
 calendar_selection_mode: range
@@ -52,6 +53,9 @@ is shown with rounded start/end caps. Set `calendar_selection_mode: toggle` to
 use the original single-day add/remove behavior. The calendar can be navigated
 backward or forward without a date limit; use **Today** to return to the
 current month.
+Set `view_mode: details` to open directly on the statistics and forecast view;
+the in-card switch lets you change between **Gauge** and **Details** at any
+time.
 
 ## Heatmap example
 
